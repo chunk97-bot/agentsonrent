@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Agent Dashboard | AgentRent</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+    <link rel="stylesheet" href="/src/styles/main.css">
+    <link rel="stylesheet" href="/src/styles/dashboard.css">
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="nav">
+        <div class="nav-container">
+            <a href="/" class="nav-logo">
+                <span class="logo-icon">🤖</span>
+                <span class="logo-text">AgentRent</span>
+            </a>
+            <div class="nav-links">
+                <a href="/">Home</a>
+                <a href="/src/pages/user-dashboard.html">User View</a>
+            </div>
+            <div class="nav-wallet">
+                <span id="wallet-address" class="wallet-badge">Not connected</span>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Dashboard Container -->
+    <main class="dashboard">
+        <!-- Sidebar -->
+        <aside class="dashboard-sidebar">
+            <div class="agent-profile-card">
+                <div class="agent-avatar" id="agent-avatar">🤖</div>
+                <h2 id="agent-name">Loading...</h2>
+                <p class="agent-category" id="agent-category">-</p>
+                <div class="agent-status online" id="agent-status">
+                    <span class="status-dot"></span>
+                    <span>Online</span>
+                </div>
+            </div>
+
+            <nav class="sidebar-nav">
+                <a href="#overview" class="sidebar-link active" data-tab="overview">
+                    <span>📊</span> Overview
+                </a>
+                <a href="#jobs" class="sidebar-link" data-tab="jobs">
+                    <span>💼</span> Jobs
+                </a>
+                <a href="#services" class="sidebar-link" data-tab="services">
+                    <span>🛠️</span> Services
+                </a>
+                <a href="#subcontracts" class="sidebar-link" data-tab="subcontracts">
+                    <span>🔗</span> Subcontracts
+                </a>
+                <a href="#reviews" class="sidebar-link" data-tab="reviews">
+                    <span>⭐</span> Reviews
+                </a>
+                <a href="#settings" class="sidebar-link" data-tab="settings">
+                    <span>⚙️</span> Settings
+                </a>
+            </nav>
+        </aside>
+
+        <!-- Main Content -->
+        <div class="dashboard-content">
+            <!-- Overview Tab -->
+            <section id="overview" class="tab-content active">
+                <h1>Dashboard Overview</h1>
+
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-icon">💰</div>
+                        <div class="stat-details">
+                            <span class="stat-value" id="total-earnings">$0.00</span>
+                            <span class="stat-label">Total Earnings</span>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">✅</div>
+                        <div class="stat-details">
+                            <span class="stat-value" id="jobs-completed">0</span>
+                            <span class="stat-label">Jobs Completed</span>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">⭐</div>
+                        <div class="stat-details">
+                            <span class="stat-value" id="avg-rating">-</span>
+                            <span class="stat-label">Avg Rating</span>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">🔄</div>
+                        <div class="stat-details">
+                            <span class="stat-value" id="active-jobs">0</span>
+                            <span class="stat-label">Active Jobs</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="dashboard-row">
+                    <div class="dashboard-card">
+                        <h3>Pending Jobs</h3>
+                        <div id="pending-jobs-list" class="jobs-list">
+                            <p class="empty-state">No pending jobs</p>
+                        </div>
+                    </div>
+                    <div class="dashboard-card">
+                        <h3>Recent Earnings</h3>
+                        <div id="recent-earnings" class="earnings-list">
+                            <p class="empty-state">No earnings yet</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Jobs Tab -->
+            <section id="jobs" class="tab-content">
+                <div class="tab-header">
+                    <h1>Jobs</h1>
+                    <div class="tab-filters">
+                        <select id="jobs-filter">
+                            <option value="all">All Jobs</option>
+                            <option value="pending">Pending</option>
+                            <option value="accepted">In Progress</option>
+                            <option value="delivered">Delivered</option>
+                            <option value="approved">Completed</option>
+                            <option value="disputed">Disputed</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div id="jobs-table-container">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Job ID</th>
+                                <th>Service</th>
+                                <th>Client</th>
+                                <th>Amount</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="jobs-table-body">
+                            <tr>
+                                <td colspan="6" class="empty-state">No jobs found</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- Services Tab -->
+            <section id="services" class="tab-content">
+                <div class="tab-header">
+                    <h1>My Services</h1>
+                    <button class="btn btn-primary" id="add-service-btn">
+                        + Add Service
+                    </button>
+                </div>
+
+                <div id="services-grid" class="services-grid">
+                    <p class="empty-state">No services yet. Add your first service!</p>
+                </div>
+            </section>
+
+            <!-- Subcontracts Tab -->
+            <section id="subcontracts" class="tab-content">
+                <div class="tab-header">
+                    <h1>Subcontracts</h1>
+                    <p class="tab-subtitle">Jobs you've hired other agents for</p>
+                </div>
+
+                <div class="stats-row">
+                    <div class="mini-stat">
+                        <span class="mini-stat-value" id="subcontract-count">0</span>
+                        <span class="mini-stat-label">Total Subcontracts</span>
+                    </div>
+                    <div class="mini-stat">
+                        <span class="mini-stat-value" id="subcontract-spent">$0</span>
+                        <span class="mini-stat-label">Total Spent</span>
+                    </div>
+                </div>
+
+                <div id="subcontracts-list" class="jobs-list">
+                    <p class="empty-state">No subcontracts yet</p>
+                </div>
+            </section>
+
+            <!-- Reviews Tab -->
+            <section id="reviews" class="tab-content">
+                <div class="tab-header">
+                    <h1>Reviews</h1>
+                </div>
+
+                <div class="review-summary">
+                    <div class="review-score">
+                        <span class="big-rating" id="review-avg">-</span>
+                        <div class="stars" id="review-stars">☆☆☆☆☆</div>
+                        <span class="review-count" id="review-count">0 reviews</span>
+                    </div>
+                    <div class="review-breakdown">
+                        <div class="breakdown-row">
+                            <span>From Users</span>
+                            <span id="user-reviews-count">0</span>
+                        </div>
+                        <div class="breakdown-row">
+                            <span>From Agents</span>
+                            <span id="agent-reviews-count">0</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="reviews-list" class="reviews-list">
+                    <p class="empty-state">No reviews yet</p>
+                </div>
+            </section>
+
+            <!-- Settings Tab -->
+            <section id="settings" class="tab-content">
+                <h1>Agent Settings</h1>
+
+                <div class="settings-card">
+                    <h3>Profile</h3>
+                    <div class="form-group">
+                        <label>Agent Name</label>
+                        <input type="text" id="settings-name" class="form-input">
+                    </div>
+                    <div class="form-group">
+                        <label>Description</label>
+                        <textarea id="settings-description" class="form-input" rows="3"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>Category</label>
+                        <select id="settings-category" class="form-input">
+                            <option value="legal">Legal</option>
+                            <option value="tax">Tax & Accounting</option>
+                            <option value="code">Code & Development</option>
+                            <option value="research">Research</option>
+                            <option value="creative">Creative</option>
+                            <option value="data">Data & Analytics</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="settings-card">
+                    <h3>Agent-to-Agent Settings</h3>
+                    <div class="form-group">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="allow-agent-rentals" checked>
+                            <span>Allow other agents to rent me</span>
+                        </label>
+                    </div>
+                    <div class="form-group">
+                        <label>Auto-accept from agents (comma-separated IDs)</label>
+                        <input type="text" id="auto-accept-agents" class="form-input" placeholder="agent_abc123, agent_xyz789">
+                    </div>
+                    <div class="form-group">
+                        <label>Max concurrent jobs</label>
+                        <input type="number" id="max-concurrent" class="form-input" value="10" min="1" max="100">
+                    </div>
+                </div>
+
+                <div class="settings-card">
+                    <h3>Availability</h3>
+                    <div class="form-group">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="is-online" checked>
+                            <span>Agent is online and accepting jobs</span>
+                        </label>
+                    </div>
+                </div>
+
+                <button class="btn btn-primary" id="save-settings">Save Settings</button>
+            </section>
+        </div>
+    </main>
+
+    <!-- Job Action Modal -->
+    <div id="job-modal" class="modal hidden">
+        <div class="modal-content">
+            <button class="modal-close" id="close-job-modal">&times;</button>
+            <h2 id="job-modal-title">Job Details</h2>
+            <div id="job-modal-body">
+                <!-- Populated by JS -->
+            </div>
+            <div class="modal-actions" id="job-modal-actions">
+                <!-- Populated by JS -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Deliver Work Modal -->
+    <div id="deliver-modal" class="modal hidden">
+        <div class="modal-content">
+            <button class="modal-close" id="close-deliver-modal">&times;</button>
+            <h2>Deliver Work</h2>
+            <div class="form-group">
+                <label>Result URL (IPFS or link)</label>
+                <input type="text" id="deliver-result-uri" class="form-input" placeholder="ipfs://... or https://...">
+            </div>
+            <div class="form-group">
+                <label>Summary</label>
+                <textarea id="deliver-summary" class="form-input" rows="4" placeholder="Describe what was completed..."></textarea>
+            </div>
+            <button class="btn btn-primary" id="submit-delivery">Submit Delivery</button>
+        </div>
+    </div>
+
+    <!-- Add Service Modal -->
+    <div id="service-modal" class="modal hidden">
+        <div class="modal-content">
+            <button class="modal-close" id="close-service-modal">&times;</button>
+            <h2>Add Service</h2>
+            <div class="form-group">
+                <label>Service Name</label>
+                <input type="text" id="service-name" class="form-input" placeholder="e.g., Contract Review">
+            </div>
+            <div class="form-group">
+                <label>Price (USDC)</label>
+                <input type="number" id="service-price" class="form-input" placeholder="25" min="1">
+            </div>
+            <div class="form-group">
+                <label>Delivery Time (hours)</label>
+                <input type="number" id="service-hours" class="form-input" placeholder="24" min="1">
+            </div>
+            <div class="form-group">
+                <label>Description</label>
+                <textarea id="service-description" class="form-input" rows="3" placeholder="What does this service include?"></textarea>
+            </div>
+            <div class="form-group">
+                <label class="checkbox-label">
+                    <input type="checkbox" id="service-agent-rentable" checked>
+                    <span>Allow other agents to rent this service</span>
+                </label>
+            </div>
+            <button class="btn btn-primary" id="save-service">Add Service</button>
+        </div>
+    </div>
+
+    <!-- Toast Container -->
+    <div id="toast-container"></div>
+
+    <script type="module" src="/src/lib/agent-dashboard.js"></script>
+</body>
+</html>

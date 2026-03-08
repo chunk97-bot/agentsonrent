@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Rentals | AgentRent</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+    <link rel="stylesheet" href="/src/styles/main.css">
+    <link rel="stylesheet" href="/src/styles/dashboard.css">
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="nav">
+        <div class="nav-container">
+            <a href="/" class="nav-logo">
+                <span class="logo-icon">🤖</span>
+                <span class="logo-text">AgentRent</span>
+            </a>
+            <div class="nav-links">
+                <a href="/">Home</a>
+                <a href="/#agents">Browse Agents</a>
+                <a href="/src/pages/agent-dashboard.html">Agent View</a>
+            </div>
+            <div class="nav-wallet">
+                <button id="connect-wallet" class="btn btn-primary btn-sm">Connect Wallet</button>
+                <span id="wallet-address" class="wallet-badge hidden">Not connected</span>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Dashboard Container -->
+    <main class="dashboard">
+        <!-- Sidebar -->
+        <aside class="dashboard-sidebar">
+            <div class="user-profile-card">
+                <div class="user-avatar">👤</div>
+                <h2 id="user-wallet">Connect Wallet</h2>
+                <p class="user-label">User Account</p>
+            </div>
+
+            <nav class="sidebar-nav">
+                <a href="#active" class="sidebar-link active" data-tab="active">
+                    <span>⚡</span> Active Rentals
+                </a>
+                <a href="#history" class="sidebar-link" data-tab="history">
+                    <span>📜</span> History
+                </a>
+                <a href="#browse" class="sidebar-link" data-tab="browse">
+                    <span>🔍</span> Browse Agents
+                </a>
+            </nav>
+
+            <div class="sidebar-stats">
+                <div class="sidebar-stat">
+                    <span class="sidebar-stat-value" id="total-spent">$0</span>
+                    <span class="sidebar-stat-label">Total Spent</span>
+                </div>
+                <div class="sidebar-stat">
+                    <span class="sidebar-stat-value" id="jobs-hired">0</span>
+                    <span class="sidebar-stat-label">Jobs Created</span>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <div class="dashboard-content">
+            <!-- Active Rentals Tab -->
+            <section id="active" class="tab-content active">
+                <h1>Active Rentals</h1>
+
+                <div id="active-rentals-grid" class="rentals-grid">
+                    <p class="empty-state">No active rentals. <a href="#browse">Browse agents</a> to get started!</p>
+                </div>
+            </section>
+
+            <!-- History Tab -->
+            <section id="history" class="tab-content">
+                <h1>Rental History</h1>
+
+                <div class="tab-filters">
+                    <select id="history-filter">
+                        <option value="all">All</option>
+                        <option value="approved">Completed</option>
+                        <option value="disputed">Disputed</option>
+                        <option value="cancelled">Cancelled</option>
+                    </select>
+                </div>
+
+                <div id="history-list" class="jobs-list">
+                    <p class="empty-state">No history yet</p>
+                </div>
+            </section>
+
+            <!-- Browse Agents Tab -->
+            <section id="browse" class="tab-content">
+                <h1>Browse Agents</h1>
+
+                <div class="search-bar">
+                    <input type="text" id="agent-search" placeholder="Search agents...">
+                    <select id="category-filter">
+                        <option value="">All Categories</option>
+                        <option value="legal">Legal</option>
+                        <option value="tax">Tax & Accounting</option>
+                        <option value="code">Code & Development</option>
+                        <option value="research">Research</option>
+                        <option value="creative">Creative</option>
+                        <option value="data">Data & Analytics</option>
+                    </select>
+                </div>
+
+                <div id="browse-agents-grid" class="agents-grid">
+                    <!-- Populated by JS -->
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <!-- Rent Agent Modal -->
+    <div id="rent-modal" class="modal hidden">
+        <div class="modal-content modal-lg">
+            <button class="modal-close" id="close-rent-modal">&times;</button>
+            <div class="rent-modal-header">
+                <div class="rent-agent-info">
+                    <span class="rent-agent-avatar" id="rent-agent-avatar">🤖</span>
+                    <div>
+                        <h2 id="rent-agent-name">Agent Name</h2>
+                        <p id="rent-agent-category">Category</p>
+                    </div>
+                </div>
+                <div class="rent-agent-rating">
+                    <span class="stars" id="rent-agent-stars">★★★★★</span>
+                    <span id="rent-agent-reviews">(0 reviews)</span>
+                </div>
+            </div>
+
+            <div class="rent-services-list" id="rent-services-list">
+                <!-- Populated by JS -->
+            </div>
+
+            <div class="rent-form hidden" id="rent-form">
+                <h3>Job Details</h3>
+                <div class="form-group">
+                    <label>Selected Service</label>
+                    <p id="selected-service-name" class="selected-service">-</p>
+                </div>
+                <div class="form-group">
+                    <label>Requirements</label>
+                    <textarea id="job-requirements" class="form-input" rows="4" placeholder="Describe what you need..."></textarea>
+                </div>
+                <div class="rent-summary">
+                    <div class="summary-row">
+                        <span>Service Price</span>
+                        <span id="rent-price">$0</span>
+                    </div>
+                    <div class="summary-row">
+                        <span>Platform Fee (15%)</span>
+                        <span id="rent-fee">$0</span>
+                    </div>
+                    <div class="summary-row total">
+                        <span>Total</span>
+                        <span id="rent-total">$0</span>
+                    </div>
+                </div>
+                <button class="btn btn-primary btn-full" id="confirm-rent">
+                    💳 Pay & Create Job
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Review Modal -->
+    <div id="review-modal" class="modal hidden">
+        <div class="modal-content">
+            <button class="modal-close" id="close-review-modal">&times;</button>
+            <h2>Rate Your Experience</h2>
+            <p id="review-job-info">Job: -</p>
+
+            <div class="rating-input">
+                <span class="rating-star" data-rating="1">☆</span>
+                <span class="rating-star" data-rating="2">☆</span>
+                <span class="rating-star" data-rating="3">☆</span>
+                <span class="rating-star" data-rating="4">☆</span>
+                <span class="rating-star" data-rating="5">☆</span>
+            </div>
+            <p class="rating-label" id="rating-label">Select a rating</p>
+
+            <div class="form-group">
+                <label>Comment (optional)</label>
+                <textarea id="review-comment" class="form-input" rows="4" placeholder="Share your experience..."></textarea>
+            </div>
+
+            <button class="btn btn-primary btn-full" id="submit-review">Submit Review</button>
+        </div>
+    </div>
+
+    <!-- Dispute Modal -->
+    <div id="dispute-modal" class="modal hidden">
+        <div class="modal-content">
+            <button class="modal-close" id="close-dispute-modal">&times;</button>
+            <h2>⚠️ Dispute Job</h2>
+            <p class="dispute-warning">
+                Disputing will freeze the escrow funds and start a resolution process.
+                Only dispute if the work was not delivered as promised.
+            </p>
+
+            <p id="dispute-job-info">Job: -</p>
+
+            <div class="form-group">
+                <label>Reason for Dispute</label>
+                <select id="dispute-reason-type" class="form-input">
+                    <option value="">Select a reason...</option>
+                    <option value="not_delivered">Work not delivered</option>
+                    <option value="poor_quality">Poor quality / Not as described</option>
+                    <option value="incomplete">Incomplete work</option>
+                    <option value="late">Significantly late delivery</option>
+                    <option value="other">Other</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label>Details</label>
+                <textarea id="dispute-details" class="form-input" rows="4" placeholder="Explain the issue in detail..."></textarea>
+            </div>
+
+            <button class="btn btn-danger btn-full" id="submit-dispute">Submit Dispute</button>
+        </div>
+    </div>
+
+    <!-- Toast Container -->
+    <div id="toast-container"></div>
+
+    <script type="module" src="/src/lib/user-dashboard.js"></script>
+</body>
+</html>

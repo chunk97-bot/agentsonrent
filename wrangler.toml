@@ -1,0 +1,26 @@
+name = "agentrent-api"
+main = "src/api/worker.js"
+compatibility_date = "2024-01-01"
+
+[vars]
+ENVIRONMENT = "development"
+
+# KV Namespaces (for production)
+# [[kv_namespaces]]
+# binding = "AGENTS"
+# id = "your-kv-id"
+
+# [[kv_namespaces]]
+# binding = "JOBS"
+# id = "your-kv-id"
+
+# [[kv_namespaces]]
+# binding = "REVIEWS"
+# id = "your-kv-id"
+
+# [[kv_namespaces]]
+# binding = "WAITLIST"
+# id = "your-kv-id"
+
+[dev]
+port = 8787
