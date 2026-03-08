@@ -2,6 +2,13 @@
 
 Solana smart contract for trustless USDC payments between users and AI agents.
 
+## Overview
+
+The escrow contract ensures secure payment flow:
+1. User deposits USDC into escrow when creating a job
+2. Funds are locked until job completion or dispute resolution
+3. On approval, funds are automatically split to agent, protocol, and DAO
+
 ## Revenue Split
 
 | Recipient | Percentage | Purpose |
@@ -47,6 +54,13 @@ initialize(
 )
 ```
 
+**Required Accounts:**
+- `authority`: Protocol admin (signer)
+- `config`: PDA to store config
+- `protocol_wallet`: Wallet to receive protocol fees
+- `dao_wallet`: Wallet to receive DAO fees
+- `system_program`: System program
+
 ### `create_escrow`
 User deposits USDC into escrow.
 
@@ -58,12 +72,31 @@ create_escrow(
 )
 ```
 
+**Required Accounts:**
+- `user`: Job creator (signer)
+- `agent`: Agent providing service
+- `escrow`: PDA for this escrow
+- `escrow_vault`: Token account for USDC
+- `user_token_account`: User's USDC account
+- `config`: Protocol config
+- `token_program`: SPL Token program
+
 ### `release_escrow`
 User approves work, funds released to agent with fee split.
 
 ```rust
 release_escrow()
 ```
+
+**Required Accounts:**
+- `user`: Job creator (signer)
+- `escrow`: Escrow PDA
+- `escrow_vault`: Escrow's token account
+- `agent_token_account`: Agent's USDC account
+- `protocol_token_account`: Protocol fee wallet
+- `dao_token_account`: DAO fee wallet
+- `config`: Protocol config
+- `token_program`: SPL Token program
 
 ### `open_dispute`
 User or agent opens a dispute, funds frozen.
@@ -98,6 +131,61 @@ cancel_escrow()
 | `EscrowCreated` | escrow, user, agent, job_id, amount, deadline |
 | `EscrowReleased` | escrow, job_id, agent_amount, protocol_fee, dao_fee |
 | `DisputeOpened` | escrow, job_id, opened_by, reason |
+| `DisputeResolved` | escrow, job_id, winner |
+| `EscrowCancelled` | escrow, job_id, amount |
+
+## Deployment
+
+### Prerequisites
+- Rust 1.70+
+- Solana CLI 1.17+
+- Anchor 0.29+
+
+### Build
+
+```bash
+cd contracts/agentrent_escrow
+anchor build
+```
+
+### Deploy to Devnet
+
+```bash
+anchor deploy --provider.cluster devnet
+```
+
+### Deploy to Mainnet
+
+```bash
+anchor deploy --provider.cluster mainnet
+```
+
+### Initialize Protocol
+
+```bash
+# Using TypeScript client
+cd contracts/client
+npx ts-node init.ts --protocol-wallet <WALLET> --dao-wallet <WALLET>
+```
+
+## Security Considerations
+
+1. **PDA Authority**: All escrow vaults are PDAs controlled by the program
+2. **Signature Verification**: All state changes require proper signatures
+3. **Deadline Enforcement**: Jobs must be completed before deadline
+4. **Dispute Freeze**: Funds are frozen during disputes
+5. **Fee Limits**: Protocol + DAO fees cannot exceed 20%
+
+## Testing
+
+```bash
+cd contracts
+anchor test
+```
+
+## License
+
+MIT
 | `DisputeResolved` | escrow, job_id, winner |
 | `EscrowCancelled` | escrow, job_id, amount |
 

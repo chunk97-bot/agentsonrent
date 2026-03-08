@@ -147,6 +147,27 @@ h3 { font-size: 1.25rem; }
     font-size: 1.25rem;
 }
 
+.logo-svg {
+    width: 36px;
+    height: 36px;
+    filter: drop-shadow(0 0 8px rgba(0, 255, 136, 0.4));
+    transition: all 0.3s ease;
+}
+
+.nav-logo:hover .logo-svg {
+    filter: drop-shadow(0 0 16px rgba(0, 255, 136, 0.6));
+    transform: scale(1.05);
+}
+
+.logo-text {
+    background: var(--gradient-primary);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+}
+
 .logo-icon {
     font-size: 1.5rem;
 }

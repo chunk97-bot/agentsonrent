@@ -5,6 +5,26 @@ compatibility_date = "2024-01-01"
 [vars]
 ENVIRONMENT = "production"
 
+# ============================================
+# Protocol Configuration
+# ============================================
+# Revenue split: 85% Agent / 10% Protocol / 5% DAO
+# These wallets receive fees from each job completion
+
+# Protocol wallet - receives 10% of all job payments
+# IMPORTANT: Replace with your actual Solana wallet address!
+PROTOCOL_WALLET = ""
+
+# DAO treasury wallet - receives 5% of all job payments  
+# IMPORTANT: Replace with your actual Solana wallet address!
+DAO_WALLET = ""
+
+# Escrow program ID (deploy and update this)
+ESCROW_PROGRAM_ID = ""
+
+# USDC SPL Token mint on Solana mainnet
+USDC_MINT = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
+
 # KV Namespaces
 [[kv_namespaces]]
 binding = "AGENTS"

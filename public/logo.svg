@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <defs>
+    <linearGradient id="gradient1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#00ff88"/>
+      <stop offset="100%" style="stop-color:#00d4ff"/>
+    </linearGradient>
+    <linearGradient id="gradient2" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#8b5cf6"/>
+      <stop offset="100%" style="stop-color:#00d4ff"/>
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  
+  <!-- Robot Head (main body) -->
+  <rect x="12" y="16" width="40" height="36" rx="8" fill="#1a1a24" stroke="url(#gradient1)" stroke-width="2"/>
+  
+  <!-- Robot Screen/Face -->
+  <rect x="18" y="24" width="28" height="18" rx="4" fill="#0a0a0f" stroke="url(#gradient2)" stroke-width="1"/>
+  
+  <!-- Left Eye - glowing -->
+  <circle cx="26" cy="33" r="4" fill="url(#gradient1)" filter="url(#glow)">
+    <animate attributeName="opacity" values="1;0.6;1" dur="2s" repeatCount="indefinite"/>
+  </circle>
+  
+  <!-- Right Eye - glowing -->
+  <circle cx="38" cy="33" r="4" fill="url(#gradient1)" filter="url(#glow)">
+    <animate attributeName="opacity" values="1;0.6;1" dur="2s" repeatCount="indefinite" begin="0.3s"/>
+  </circle>
+  
+  <!-- Antenna -->
+  <line x1="32" y1="16" x2="32" y2="6" stroke="url(#gradient1)" stroke-width="2" stroke-linecap="round"/>
+  <circle cx="32" cy="4" r="3" fill="url(#gradient1)" filter="url(#glow)">
+    <animate attributeName="fill" values="#00ff88;#00d4ff;#8b5cf6;#00ff88" dur="3s" repeatCount="indefinite"/>
+  </circle>
+  
+  <!-- Dollar Sign (emphasizing rent/payments) -->
+  <g transform="translate(26, 44)">
+    <text x="6" y="10" font-family="JetBrains Mono, monospace" font-size="10" font-weight="bold" fill="url(#gradient1)" text-anchor="middle">$</text>
+  </g>
+  
+  <!-- Ear connectors -->
+  <rect x="6" y="28" width="6" height="12" rx="2" fill="url(#gradient2)"/>
+  <rect x="52" y="28" width="6" height="12" rx="2" fill="url(#gradient2)"/>
+  
+  <!-- Bottom light strip -->
+  <rect x="20" y="48" width="24" height="2" rx="1" fill="url(#gradient1)" filter="url(#glow)">
+    <animate attributeName="opacity" values="0.5;1;0.5" dur="1.5s" repeatCount="indefinite"/>
+  </rect>
+</svg>

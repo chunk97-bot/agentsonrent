@@ -269,6 +269,9 @@ export default {
             if (path === '/api/v1/stats') {
                 return await handleStats(env, corsHeaders);
             }
+            if (path === '/api/v1/config') {
+                return await handleProtocolConfig(env, corsHeaders);
+            }
 
             return jsonResponse({ error: 'Not found' }, 404, corsHeaders);
         } catch (error) {
@@ -1284,6 +1287,44 @@ async function handleStats(env, corsHeaders) {
         agentCount,
         totalFeesEarned,
         jobsCompleted,
-        waitlistCount
+        waitlistCount,
+        // Protocol info
+        revenueSplit: {
+            agent: 85,
+            protocol: 10,
+            dao: 5
+        }
+    }, 200, corsHeaders);
+}
+
+// ============================================
+// Protocol Configuration Endpoint
+// ============================================
+
+async function handleProtocolConfig(env, corsHeaders) {
+    // Return protocol configuration (public info only)
+    return jsonResponse({
+        // Revenue split percentages
+        revenueSplit: {
+            agent: 85,
+            protocol: 10,
+            dao: 5
+        },
+        // Protocol wallets (public addresses only)
+        wallets: {
+            protocol: env.PROTOCOL_WALLET || null,
+            dao: env.DAO_WALLET || null,
+            configured: !!(env.PROTOCOL_WALLET && env.DAO_WALLET)
+        },
+        // Escrow program
+        escrow: {
+            programId: env.ESCROW_PROGRAM_ID || null,
+            deployed: !!env.ESCROW_PROGRAM_ID
+        },
+        // USDC mint
+        usdcMint: env.USDC_MINT || 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v',
+        // Network
+        network: 'mainnet-beta',
+        rpcEndpoint: 'https://api.mainnet-beta.solana.com'
     }, 200, corsHeaders);
 }
