@@ -1,134 +1,52 @@
 /**
  * AgentRent - Main Application
- * Handles UI interactions, wallet connection, agent loading
+ * Production version - Uses real API, no mock data
  */
 
 import { WalletAdapter } from './wallet.js';
 import { ApiClient } from './api-client.js';
-import { showToast, formatAddress, formatRating } from './utils.js';
+import { showToast, formatAddress, formatRating, escapeHtml } from './utils.js';
 
 // Initialize
 const wallet = new WalletAdapter();
 const api = new ApiClient();
 
-// Sample agents data (will be replaced by API calls)
-const SAMPLE_AGENTS = [
-    {
-        id: 'agent_001',
-        name: 'TaxBot Pro',
-        avatar: '🧮',
-        wallet: 'So1ana...abc',
-        description: 'Expert tax filing agent. 99.2% accuracy rate. Handles W2, 1099, and complex returns.',
-        category: 'tax',
-        rating: 4.9,
-        reviewCount: 2341,
-        jobsCompleted: 847,
-        isOnline: true,
-        services: [
-            { name: 'W2 Filing', price: 15, currency: 'USDC', deliveryHours: 2 },
-            { name: '1099 Processing', price: 25, currency: 'USDC', deliveryHours: 4 },
-            { name: 'Full Tax Return', price: 75, currency: 'USDC', deliveryHours: 24 }
-        ]
-    },
-    {
-        id: 'agent_002',
-        name: 'LegalEagle AI',
-        avatar: '⚖️',
-        wallet: 'So1ana...def',
-        description: 'Contract review, NDA drafting, and legal research. Bar-certified guidance.',
-        category: 'legal',
-        rating: 4.7,
-        reviewCount: 892,
-        jobsCompleted: 423,
-        isOnline: true,
-        services: [
-            { name: 'Contract Review', price: 20, currency: 'USDC', deliveryHours: 1 },
-            { name: 'NDA Draft', price: 15, currency: 'USDC', deliveryHours: 0.5 },
-            { name: 'Legal Research', price: 50, currency: 'USDC', deliveryHours: 4 }
-        ]
-    },
-    {
-        id: 'agent_003',
-        name: 'CodeReview Bot',
-        avatar: '💻',
-        wallet: 'So1ana...ghi',
-        description: 'Senior-level code review. Finds bugs, security issues, and suggests improvements.',
-        category: 'code',
-        rating: 4.8,
-        reviewCount: 1567,
-        jobsCompleted: 612,
-        isOnline: false,
-        services: [
-            { name: 'PR Review', price: 5, currency: 'USDC', deliveryHours: 1 },
-            { name: 'Security Audit', price: 50, currency: 'USDC', deliveryHours: 24 },
-            { name: 'Bug Hunt', price: 100, currency: 'USDC', deliveryHours: 48 }
-        ]
-    },
-    {
-        id: 'agent_004',
-        name: 'ResearchBot',
-        avatar: '🔬',
-        wallet: 'So1ana...jkl',
-        description: 'Academic and market research. Literature reviews, data analysis, citations.',
-        category: 'research',
-        rating: 4.6,
-        reviewCount: 678,
-        jobsCompleted: 289,
-        isOnline: true,
-        services: [
-            { name: 'Literature Review', price: 30, currency: 'USDC', deliveryHours: 8 },
-            { name: 'Market Analysis', price: 75, currency: 'USDC', deliveryHours: 24 },
-            { name: 'Data Summary', price: 15, currency: 'USDC', deliveryHours: 2 }
-        ]
-    },
-    {
-        id: 'agent_005',
-        name: 'CopyWriter Pro',
-        avatar: '✍️',
-        wallet: 'So1ana...mno',
-        description: 'Compelling copy for ads, landing pages, emails. Conversion-focused writing.',
-        category: 'creative',
-        rating: 4.5,
-        reviewCount: 1234,
-        jobsCompleted: 567,
-        isOnline: true,
-        services: [
-            { name: 'Ad Copy', price: 10, currency: 'USDC', deliveryHours: 1 },
-            { name: 'Landing Page', price: 25, currency: 'USDC', deliveryHours: 4 },
-            { name: 'Email Sequence', price: 40, currency: 'USDC', deliveryHours: 8 }
-        ]
-    },
-    {
-        id: 'agent_006',
-        name: 'DataCrunch AI',
-        avatar: '📊',
-        wallet: 'So1ana...pqr',
-        description: 'Data cleaning, analysis, and visualization. Excel, SQL, Python pandas.',
-        category: 'data',
-        rating: 4.8,
-        reviewCount: 456,
-        jobsCompleted: 198,
-        isOnline: true,
-        services: [
-            { name: 'Data Cleaning', price: 20, currency: 'USDC', deliveryHours: 2 },
-            { name: 'Analysis Report', price: 50, currency: 'USDC', deliveryHours: 8 },
-            { name: 'Dashboard', price: 100, currency: 'USDC', deliveryHours: 24 }
-        ]
-    }
-];
-
 // State
 let currentWallet = null;
+let agents = [];
 let currentCategory = '';
 let searchQuery = '';
+let isLoading = false;
+
+// Platform Stats (fetched from API)
+let platformStats = {
+    agentCount: 0,
+    totalFeesEarned: 0,
+    jobsCompleted: 0,
+    waitlistCount: 0
+};
 
 // DOM Ready
 document.addEventListener('DOMContentLoaded', () => {
     initWallet();
     initWaitlist();
-    initAgentGrid();
+    loadAgents();
+    loadPlatformStats();
     initSearch();
     initModal();
+    
+    // Listen for wallet events
+    wallet.on('disconnect', () => {
+        currentWallet = null;
+        updateWalletUI(null);
+        showToast('info', 'Wallet disconnected');
+    });
+
+    wallet.on('accountChanged', (address) => {
+        currentWallet = address;
+        updateWalletUI(address);
+        showToast('info', `Account changed: ${formatAddress(address)}`);
+    });
 });
 
 // ============================================
@@ -140,10 +58,8 @@ function initWallet() {
 
     connectBtn.addEventListener('click', () => {
         if (currentWallet) {
-            // Already connected - show disconnect option
             disconnectWallet();
         } else {
-            // Show wallet modal
             document.getElementById('wallet-modal').classList.remove('hidden');
         }
     });
@@ -161,16 +77,37 @@ function initWallet() {
 }
 
 async function connectWallet(walletType) {
+    const btn = document.querySelector(`[data-wallet="${walletType}"]`);
+    const originalContent = btn.innerHTML;
+    
     try {
+        // Show loading state
+        btn.innerHTML = '<span class="spinner"></span> Connecting...';
+        btn.disabled = true;
+
         const address = await wallet.connect(walletType);
+        
         if (address) {
             currentWallet = address;
             updateWalletUI(address);
             closeWalletModal();
             showToast('success', `Connected: ${formatAddress(address)}`);
+            
+            // Check SOL balance
+            try {
+                const { hasEnough, balance } = await wallet.checkSufficientBalance(0.01);
+                if (!hasEnough) {
+                    showToast('warning', `Low SOL balance (${balance.toFixed(4)} SOL). You need at least 0.01 SOL for transaction fees.`);
+                }
+            } catch (e) {
+                console.warn('Balance check failed:', e);
+            }
         }
     } catch (error) {
         showToast('error', error.message || 'Failed to connect wallet');
+    } finally {
+        btn.innerHTML = originalContent;
+        btn.disabled = false;
     }
 }
 
@@ -183,15 +120,55 @@ async function disconnectWallet() {
 
 function updateWalletUI(address) {
     const connectBtn = document.getElementById('connect-wallet');
-    connectBtn.textContent = formatAddress(address);
+    if (address) {
+        connectBtn.textContent = formatAddress(address);
+        connectBtn.classList.add('connected');
+    } else {
+        connectBtn.textContent = 'Connect Wallet';
+        connectBtn.classList.remove('connected');
+    }
 }
 
 async function checkExistingConnection() {
-    const address = await wallet.checkConnection();
-    if (address) {
-        currentWallet = address;
-        updateWalletUI(address);
+    try {
+        const address = await wallet.checkConnection();
+        if (address) {
+            currentWallet = address;
+            updateWalletUI(address);
+        }
+    } catch (e) {
+        console.warn('Auto-reconnect failed:', e);
     }
+}
+
+// ============================================
+// Platform Stats
+// ============================================
+
+async function loadPlatformStats() {
+    try {
+        const response = await api.getStats();
+        if (response) {
+            platformStats = response;
+            updateStatsUI();
+        }
+    } catch (error) {
+        console.warn('Failed to load stats:', error);
+        // Show zeros if API fails
+        updateStatsUI();
+    }
+}
+
+function updateStatsUI() {
+    const agentCountEl = document.getElementById('agent-count');
+    const feesEarnedEl = document.getElementById('fees-earned');
+    const jobsCompletedEl = document.getElementById('jobs-completed');
+    const waitlistNumberEl = document.getElementById('waitlist-number');
+
+    if (agentCountEl) agentCountEl.textContent = platformStats.agentCount || 0;
+    if (feesEarnedEl) feesEarnedEl.textContent = `$${(platformStats.totalFeesEarned || 0).toLocaleString()}`;
+    if (jobsCompletedEl) jobsCompletedEl.textContent = (platformStats.jobsCompleted || 0).toLocaleString();
+    if (waitlistNumberEl) waitlistNumberEl.textContent = (platformStats.waitlistCount || 0).toLocaleString();
 }
 
 // ============================================
@@ -202,26 +179,32 @@ function initWaitlist() {
     const form = document.getElementById('waitlist-form');
     const emailInput = document.getElementById('waitlist-email');
 
+    if (!form) return;
+
     form.addEventListener('submit', async (e) => {
         e.preventDefault();
         const email = emailInput.value.trim();
 
         if (!email) return;
 
+        const submitBtn = form.querySelector('button[type="submit"]');
+        const originalText = submitBtn.textContent;
+        
         try {
-            // In production, this would call the API
-            // await api.joinWaitlist(email);
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Joining...';
 
-            // For now, simulate success
+            await api.joinWaitlist(email);
             showToast('success', 'You\'re on the waitlist! 🎉');
             emailInput.value = '';
 
-            // Update counter
-            const counter = document.getElementById('waitlist-number');
-            const current = parseInt(counter.textContent.replace(',', ''));
-            counter.textContent = (current + 1).toLocaleString();
+            // Refresh stats to get new waitlist count
+            await loadPlatformStats();
         } catch (error) {
-            showToast('error', 'Failed to join waitlist');
+            showToast('error', error.message || 'Failed to join waitlist');
+        } finally {
+            submitBtn.disabled = false;
+            submitBtn.textContent = originalText;
         }
     });
 }
@@ -230,30 +213,66 @@ function initWaitlist() {
 // Agent Grid
 // ============================================
 
-function initAgentGrid() {
-    renderAgents(SAMPLE_AGENTS);
-
-    // Load more button
-    document.getElementById('load-more-agents').addEventListener('click', () => {
-        showToast('info', 'All agents loaded');
-    });
-}
-
-function renderAgents(agents) {
+async function loadAgents() {
     const grid = document.getElementById('agents-grid');
+    
+    // Show loading state
+    grid.innerHTML = `
+        <div class="agent-card loading">
+            <div class="skeleton skeleton-avatar"></div>
+            <div class="skeleton skeleton-text"></div>
+            <div class="skeleton skeleton-text short"></div>
+        </div>
+        <div class="agent-card loading">
+            <div class="skeleton skeleton-avatar"></div>
+            <div class="skeleton skeleton-text"></div>
+            <div class="skeleton skeleton-text short"></div>
+        </div>
+        <div class="agent-card loading">
+            <div class="skeleton skeleton-avatar"></div>
+            <div class="skeleton skeleton-text"></div>
+            <div class="skeleton skeleton-text short"></div>
+        </div>
+    `;
+    
+    isLoading = true;
 
-    if (agents.length === 0) {
+    try {
+        const response = await api.getAgents();
+        agents = response.agents ? Object.values(response.agents) : [];
+        renderAgents(agents);
+    } catch (error) {
+        console.error('Failed to load agents:', error);
         grid.innerHTML = `
             <div class="no-results">
-                <p>No agents found matching your criteria</p>
+                <p>Failed to load agents. <button class="btn btn-secondary" onclick="location.reload()">Retry</button></p>
+            </div>
+        `;
+    } finally {
+        isLoading = false;
+    }
+}
+
+function renderAgents(agentList) {
+    const grid = document.getElementById('agents-grid');
+
+    if (!agentList || agentList.length === 0) {
+        grid.innerHTML = `
+            <div class="no-results">
+                <div class="empty-state">
+                    <span class="empty-icon">🤖</span>
+                    <h3>No Agents Yet</h3>
+                    <p>Be the first to list your AI agent and start earning!</p>
+                    <a href="#list-agent" class="btn btn-primary">Launch Your Agent</a>
+                </div>
             </div>
         `;
         return;
     }
 
-    grid.innerHTML = agents.map(agent => createAgentCard(agent)).join('');
+    grid.innerHTML = agentList.map(agent => createAgentCard(agent)).join('');
 
-    // Add click handlers to rent buttons
+    // Add click handlers
     grid.querySelectorAll('.btn-rent').forEach(btn => {
         btn.addEventListener('click', (e) => {
             const agentId = e.target.dataset.agentId;
@@ -263,40 +282,51 @@ function renderAgents(agents) {
 }
 
 function createAgentCard(agent) {
-    const servicesHtml = agent.services.slice(0, 2).map(service => `
+    const name = escapeHtml(agent.name || agent.profile?.name || 'Unnamed Agent');
+    const description = escapeHtml(agent.description || agent.profile?.description || 'AI Agent');
+    const avatar = agent.avatar || agent.profile?.avatar || '🤖';
+    const category = agent.category || agent.profile?.category || 'other';
+    const rating = agent.rating || 0;
+    const reviewCount = agent.reviewCount || 0;
+    const jobsCompleted = agent.jobsCompleted || 0;
+    const isOnline = agent.isOnline !== false;
+    const services = agent.services || [];
+
+    const servicesHtml = services.slice(0, 2).map(service => `
         <div class="service-tag">
-            <span>${service.name}</span>
-            <span class="service-price">${service.price} ${service.currency}</span>
+            <span>${escapeHtml(service.name)}</span>
+            <span class="service-price">${service.price} ${service.currency || 'USDC'}</span>
         </div>
     `).join('');
 
-    const statusDot = agent.isOnline
-        ? '<span style="color: #00ff88;">●</span>'
-        : '<span style="color: #6a6a7a;">●</span>';
+    const statusDot = isOnline
+        ? '<span class="status-dot online">●</span>'
+        : '<span class="status-dot offline">●</span>';
 
     return `
-        <div class="agent-card" data-agent-id="${agent.id}">
+        <div class="agent-card" data-agent-id="${escapeHtml(agent.id)}">
             <div class="agent-header">
-                <div class="agent-avatar">${agent.avatar}</div>
+                <div class="agent-avatar">${avatar}</div>
                 <div>
-                    <div class="agent-name">${agent.name}</div>
+                    <div class="agent-name">${name}</div>
                     <div class="agent-rating">
                         <span class="star">★</span>
-                        <span>${agent.rating}</span>
-                        <span>(${agent.reviewCount.toLocaleString()})</span>
+                        <span>${rating.toFixed(1)}</span>
+                        <span class="review-count">(${reviewCount.toLocaleString()})</span>
                     </div>
                 </div>
+                <span class="category-badge">${escapeHtml(category)}</span>
             </div>
-            <p class="agent-description">${agent.description}</p>
+            <p class="agent-description">${description}</p>
             <div class="agent-services">
                 ${servicesHtml}
-                ${agent.services.length > 2 ? `<span class="more-services">+${agent.services.length - 2} more services</span>` : ''}
+                ${services.length > 2 ? `<span class="more-services">+${services.length - 2} more</span>` : ''}
             </div>
             <div class="agent-footer">
                 <div class="agent-meta">
-                    ${statusDot} ${agent.isOnline ? 'Online' : 'Offline'} · ${agent.jobsCompleted} jobs
+                    ${statusDot} ${isOnline ? 'Online' : 'Offline'} · ${jobsCompleted} jobs
                 </div>
-                <button class="btn btn-primary btn-rent" data-agent-id="${agent.id}">
+                <button class="btn btn-primary btn-rent" data-agent-id="${escapeHtml(agent.id)}">
                     Rent
                 </button>
             </div>
@@ -304,17 +334,30 @@ function createAgentCard(agent) {
     `;
 }
 
-function handleRentClick(agentId) {
+async function handleRentClick(agentId) {
     if (!currentWallet) {
         document.getElementById('wallet-modal').classList.remove('hidden');
         showToast('info', 'Connect wallet to rent agents');
         return;
     }
 
-    const agent = SAMPLE_AGENTS.find(a => a.id === agentId);
+    // Check balance before proceeding
+    try {
+        const { hasEnough, balance } = await wallet.checkSufficientBalance(0.01);
+        if (!hasEnough) {
+            showToast('error', `Insufficient SOL balance (${balance.toFixed(4)} SOL). You need at least 0.01 SOL for transaction fees.`);
+            return;
+        }
+    } catch (e) {
+        console.warn('Balance check failed:', e);
+    }
+
+    // Navigate to agent detail page or show modal
+    const agent = agents.find(a => a.id === agentId);
     if (agent) {
-        // In production, navigate to agent detail page
-        showToast('info', `Opening ${agent.name}... (Coming soon)`);
+        // For now, show a toast. In production, navigate to agent page
+        showToast('info', `Opening ${agent.name || 'Agent'}... (Feature coming soon)`);
+        // window.location.href = `/agent/${agentId}`;
     }
 }
 
@@ -326,30 +369,40 @@ function initSearch() {
     const searchInput = document.getElementById('agent-search');
     const categorySelect = document.getElementById('category-filter');
 
-    searchInput.addEventListener('input', (e) => {
-        searchQuery = e.target.value.toLowerCase();
-        filterAgents();
-    });
+    if (searchInput) {
+        searchInput.addEventListener('input', (e) => {
+            searchQuery = e.target.value.toLowerCase();
+            filterAgents();
+        });
+    }
 
-    categorySelect.addEventListener('change', (e) => {
-        currentCategory = e.target.value;
-        filterAgents();
-    });
+    if (categorySelect) {
+        categorySelect.addEventListener('change', (e) => {
+            currentCategory = e.target.value;
+            filterAgents();
+        });
+    }
 }
 
 function filterAgents() {
-    let filtered = SAMPLE_AGENTS;
+    let filtered = agents;
 
     if (currentCategory) {
-        filtered = filtered.filter(a => a.category === currentCategory);
+        filtered = filtered.filter(a => 
+            (a.category || a.profile?.category) === currentCategory
+        );
     }
 
     if (searchQuery) {
-        filtered = filtered.filter(a =>
-            a.name.toLowerCase().includes(searchQuery) ||
-            a.description.toLowerCase().includes(searchQuery) ||
-            a.services.some(s => s.name.toLowerCase().includes(searchQuery))
-        );
+        filtered = filtered.filter(a => {
+            const name = (a.name || a.profile?.name || '').toLowerCase();
+            const desc = (a.description || a.profile?.description || '').toLowerCase();
+            const services = a.services || [];
+            
+            return name.includes(searchQuery) ||
+                   desc.includes(searchQuery) ||
+                   services.some(s => s.name.toLowerCase().includes(searchQuery));
+        });
     }
 
     renderAgents(filtered);
@@ -362,6 +415,8 @@ function filterAgents() {
 function initModal() {
     const modal = document.getElementById('wallet-modal');
     const closeBtn = document.getElementById('close-wallet-modal');
+
+    if (!modal || !closeBtn) return;
 
     closeBtn.addEventListener('click', closeWalletModal);
 
@@ -379,10 +434,24 @@ function initModal() {
 }
 
 function closeWalletModal() {
-    document.getElementById('wallet-modal').classList.add('hidden');
+    const modal = document.getElementById('wallet-modal');
+    if (modal) {
+        modal.classList.add('hidden');
+    }
 }
 
-// Update agent count
-document.getElementById('agent-count').textContent = SAMPLE_AGENTS.length;
+// ============================================
+// Load More
+// ============================================
 
-console.log('🤖 AgentRent initialized');
+const loadMoreBtn = document.getElementById('load-more-agents');
+if (loadMoreBtn) {
+    loadMoreBtn.addEventListener('click', async () => {
+        if (isLoading) return;
+        
+        // In production, implement pagination
+        showToast('info', 'All agents loaded');
+    });
+}
+
+console.log('🤖 AgentRent Production v1.0');

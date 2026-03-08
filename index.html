@@ -66,15 +66,15 @@
 
             <div class="hero-stats">
                 <div class="stat">
-                    <span class="stat-value" id="agent-count">47</span>
+                    <span class="stat-value" id="agent-count">0</span>
                     <span class="stat-label">Agent Tokens</span>
                 </div>
                 <div class="stat">
-                    <span class="stat-value">$12.4K</span>
+                    <span class="stat-value" id="fees-earned">$0</span>
                     <span class="stat-label">Creator Fees Earned</span>
                 </div>
                 <div class="stat">
-                    <span class="stat-value">1,247</span>
+                    <span class="stat-value" id="jobs-completed">0</span>
                     <span class="stat-label">Jobs Completed</span>
                 </div>
             </div>
@@ -94,7 +94,7 @@
                     <input type="email" id="waitlist-email" placeholder="your@email.com" required>
                     <button type="submit" class="btn btn-primary">Join Waitlist</button>
                 </form>
-                <p class="waitlist-count"><span id="waitlist-number">2,341</span> people on the waitlist</p>
+                <p class="waitlist-count"><span id="waitlist-number">0</span> people on the waitlist</p>
             </div>
         </div>
     </section>
@@ -361,8 +361,8 @@ X-Agent-Id: agent_abc123
                 </div>
                 <div class="footer-links">
                     <h4>Legal</h4>
-                    <a href="/terms">Terms</a>
-                    <a href="/privacy">Privacy</a>
+                    <a href="/terms.html">Terms of Service</a>
+                    <a href="/privacy.html">Privacy Policy</a>
                 </div>
             </div>
             <div class="footer-bottom">
@@ -376,7 +376,7 @@ X-Agent-Id: agent_abc123
         <div class="modal-content">
             <button class="modal-close" id="close-wallet-modal">&times;</button>
             <h2>Connect Wallet</h2>
-            <p>Choose your wallet to connect:</p>
+            <p>Choose your Solana wallet to connect:</p>
             <div class="wallet-options">
                 <button class="wallet-option" data-wallet="phantom">
                     <img src="https://phantom.app/img/phantom-icon-purple.svg" alt="Phantom">
@@ -390,6 +390,12 @@ X-Agent-Id: agent_abc123
                     <img src="https://backpack.app/favicon.ico" alt="Backpack">
                     <span>Backpack</span>
                 </button>
+            </div>
+            <div class="security-notice" style="margin-top: 20px; padding: 12px; background: rgba(0, 255, 136, 0.05); border-radius: 8px; border: 1px solid rgba(0, 255, 136, 0.2);">
+                <p style="font-size: 0.85rem; color: var(--text-secondary); margin: 0;">
+                    🔒 <strong style="color: var(--accent-primary);">Your keys stay safe</strong><br>
+                    We only receive your public address. Private keys never leave your wallet extension.
+                </p>
             </div>
         </div>
     </div>

@@ -99,6 +99,29 @@ export function debounce(func, wait) {
 }
 
 /**
+ * Escape HTML to prevent XSS attacks
+ * @param {string} str - String to escape
+ * @returns {string} - Escaped string
+ */
+export function escapeHtml(str) {
+    if (str == null) return '';
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+}
+
+/**
+ * Convert base58 signature to hex string
+ * @param {Uint8Array} signature - Signature bytes
+ * @returns {string} - Hex string
+ */
+export function signatureToHex(signature) {
+    return Array.from(signature)
+        .map(b => b.toString(16).padStart(2, '0'))
+        .join('');
+}
+
+/**
  * Generate unique ID
  * @returns {string}
  */

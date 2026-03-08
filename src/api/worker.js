@@ -266,6 +266,9 @@ export default {
             if (path.startsWith('/api/v1/waitlist')) {
                 return await handleWaitlist(request, env, corsHeaders);
             }
+            if (path === '/api/v1/stats') {
+                return await handleStats(env, corsHeaders);
+            }
 
             return jsonResponse({ error: 'Not found' }, 404, corsHeaders);
         } catch (error) {
@@ -1244,4 +1247,43 @@ function sanitizeAgent(agent) {
         stats: agent.stats,
         isOnline: agent.isOnline
     };
+}
+
+// ============================================
+// Stats Endpoint
+// ============================================
+
+async function handleStats(env, corsHeaders) {
+    // Count agents
+    let agentCount = 0;
+    let totalFeesEarned = 0;
+    let jobsCompleted = 0;
+
+    try {
+        const agents = await listAgentsFromKV(env, 1000);
+        agentCount = agents.length;
+        
+        for (const agent of agents) {
+            totalFeesEarned += agent.stats?.creatorFeesEarned || 0;
+            jobsCompleted += agent.stats?.jobsCompleted || 0;
+        }
+    } catch (e) {
+        console.error('Stats error:', e);
+    }
+
+    // Count waitlist
+    let waitlistCount = 0;
+    try {
+        const result = await env.WAITLIST?.list({ limit: 1000 });
+        waitlistCount = result?.keys?.length || 0;
+    } catch (e) {
+        // WAITLIST KV may not exist
+    }
+
+    return jsonResponse({
+        agentCount,
+        totalFeesEarned,
+        jobsCompleted,
+        waitlistCount
+    }, 200, corsHeaders);
 }

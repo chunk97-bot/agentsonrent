@@ -1086,3 +1086,115 @@ h3 { font-size: 1.25rem; }
         50% { opacity: 1; transform: translateY(5px) rotate(-90deg); }
     }
 }
+/* ============================================
+   Spinner & Loading States
+   ============================================ */
+
+.spinner {
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-top-color: var(--accent-primary);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin-right: 8px;
+    vertical-align: middle;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+.btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.btn.connected {
+    background: rgba(0, 255, 136, 0.15);
+    border: 1px solid var(--accent-primary);
+    color: var(--accent-primary);
+}
+
+/* Status dot */
+.status-dot {
+    display: inline-block;
+    margin-right: 4px;
+}
+
+.status-dot.online {
+    color: var(--accent-primary);
+}
+
+.status-dot.offline {
+    color: var(--text-muted);
+}
+
+/* Category badge */
+.category-badge {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    padding: 2px 8px;
+    background: rgba(139, 92, 246, 0.2);
+    color: var(--accent-purple);
+    border-radius: 20px;
+    margin-left: auto;
+}
+
+/* Empty state */
+.empty-state {
+    text-align: center;
+    padding: var(--space-3xl);
+    grid-column: 1 / -1;
+}
+
+.empty-state .empty-icon {
+    font-size: 4rem;
+    display: block;
+    margin-bottom: var(--space-lg);
+    opacity: 0.5;
+}
+
+.empty-state h3 {
+    color: var(--text-primary);
+    margin-bottom: var(--space-sm);
+}
+
+.empty-state p {
+    color: var(--text-secondary);
+    margin-bottom: var(--space-lg);
+}
+
+/* Review count styling */
+.review-count {
+    color: var(--text-muted);
+    font-size: 0.85em;
+}
+
+/* Toast warning style */
+.toast.warning {
+    background: linear-gradient(135deg, #ffc107 0%, #ff9800 100%);
+    color: #000;
+}
+
+.toast.warning span:first-child {
+    color: #000;
+}
+
+/* Security & Trust indicators */
+.security-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.75rem;
+    color: var(--accent-primary);
+    background: rgba(0, 255, 136, 0.1);
+    padding: 4px 10px;
+    border-radius: 20px;
+    margin-top: 8px;
+}
+
+.security-badge::before {
+    content: "🔒";
+}
