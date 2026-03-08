@@ -116,6 +116,34 @@
                         </div>
                     </div>
                 </div>
+
+                <!-- Token Fees Section (Bags.fm Integration) -->
+                <div class="dashboard-row">
+                    <div class="dashboard-card token-fees-card">
+                        <div class="token-fees-header">
+                            <h3>🎟️ Agent Token Fees</h3>
+                            <span class="bags-badge">Powered by Bags.fm</span>
+                        </div>
+                        <p class="token-fees-description">Earn creator fees when users trade your agent token.</p>
+                        <div class="token-fees-stats">
+                            <div class="token-stat">
+                                <span class="token-stat-label">Claimable</span>
+                                <span class="token-stat-value" id="claimable-fees">Loading...</span>
+                            </div>
+                            <div class="token-stat">
+                                <span class="token-stat-label">Lifetime Earned</span>
+                                <span class="token-stat-value" id="lifetime-fees">$0.00</span>
+                            </div>
+                            <div class="token-stat">
+                                <span class="token-stat-label">Token Mint</span>
+                                <span class="token-stat-value token-mint" id="token-mint">-</span>
+                            </div>
+                        </div>
+                        <button id="claim-fees-btn" class="btn btn-primary claim-fees-btn" disabled>
+                            Claim Fees
+                        </button>
+                    </div>
+                </div>
             </section>
 
             <!-- Jobs Tab -->

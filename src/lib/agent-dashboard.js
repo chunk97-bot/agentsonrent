@@ -152,6 +152,76 @@ function updateStats() {
     const jobs = getMockJobs();
     const activeJobs = jobs.filter(j => ['pending', 'accepted', 'in_progress'].includes(j.status));
     document.getElementById('active-jobs').textContent = activeJobs.length;
+
+    // Load token fees (Bags.fm integration)
+    loadTokenFees();
+}
+
+// Load claimable token fees from Bags.fm
+async function loadTokenFees() {
+    const claimableEl = document.getElementById('claimable-fees');
+    const lifetimeEl = document.getElementById('lifetime-fees');
+    const mintEl = document.getElementById('token-mint');
+    const claimBtn = document.getElementById('claim-fees-btn');
+
+    if (!wallet.isConnected()) {
+        claimableEl.textContent = 'Connect wallet';
+        return;
+    }
+
+    try {
+        // Get agent's token info
+        const agentId = api.currentAgentId || localStorage.getItem('agentrent_current_agent');
+        
+        // For demo, use mock data
+        // In production: const tokenInfo = await api.getAgentToken(agentId);
+        const mockTokenMint = agentData.token?.mint || 'Demo...Token';
+        const mockClaimable = 12.50;
+        const mockLifetime = 45.00;
+
+        mintEl.textContent = formatAddress(mockTokenMint);
+        claimableEl.textContent = formatPrice(mockClaimable);
+        lifetimeEl.textContent = formatPrice(mockLifetime);
+
+        if (mockClaimable > 0) {
+            claimBtn.disabled = false;
+        }
+
+    } catch (error) {
+        console.error('Failed to load token fees:', error);
+        claimableEl.textContent = 'Error';
+    }
+}
+
+// Claim token fees
+window.claimTokenFees = async function() {
+    const claimBtn = document.getElementById('claim-fees-btn');
+    claimBtn.disabled = true;
+    claimBtn.textContent = 'Claiming...';
+
+    try {
+        // In production: const result = await api.claimFees(wallet.getAddress());
+        // Then sign the transaction with wallet
+        
+        // For demo, simulate success
+        await new Promise(resolve => setTimeout(resolve, 1500));
+        
+        showToast('Fees claimed successfully!', 'success');
+        document.getElementById('claimable-fees').textContent = '$0.00';
+        claimBtn.textContent = 'Claimed!';
+        
+        // Refresh stats
+        setTimeout(() => {
+            claimBtn.textContent = 'Claim Fees';
+            loadTokenFees();
+        }, 3000);
+
+    } catch (error) {
+        console.error('Failed to claim fees:', error);
+        showToast('Failed to claim fees: ' + error.message, 'error');
+        claimBtn.disabled = false;
+        claimBtn.textContent = 'Claim Fees';
+    }
 }
 
 // Load and render jobs
@@ -341,6 +411,11 @@ function setupEventListeners() {
             const tab = link.dataset.tab;
             switchTab(tab);
         });
+    });
+
+    // Claim fees button (Bags.fm integration)
+    document.getElementById('claim-fees-btn').addEventListener('click', () => {
+        window.claimTokenFees();
     });
 
     // Jobs filter
