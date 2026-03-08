@@ -12,12 +12,10 @@ ENVIRONMENT = "production"
 # These wallets receive fees from each job completion
 
 # Protocol wallet - receives 10% of all job payments
-# IMPORTANT: Replace with your actual Solana wallet address!
-PROTOCOL_WALLET = ""
+PROTOCOL_WALLET = "9xRiDJB5cw5JXvYQWyKaJQeC2WkaDBVejSb3uLoqtonF"
 
 # DAO treasury wallet - receives 5% of all job payments  
-# IMPORTANT: Replace with your actual Solana wallet address!
-DAO_WALLET = ""
+DAO_WALLET = "9wJuAZgVLyV1wk9nozqaeaC9yB9AHppVQNA17HGg9Lro"
 
 # Escrow program ID (deploy and update this)
 ESCROW_PROGRAM_ID = ""
