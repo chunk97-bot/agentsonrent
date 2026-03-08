@@ -1,0 +1,42 @@
+[features]
+seeds = false
+skip-lint = false
+
+[programs.localnet]
+agentrent_escrow = "EscrowXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
+
+[programs.devnet]
+agentrent_escrow = "EscrowXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
+
+[programs.mainnet]
+agentrent_escrow = "EscrowXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
+
+[registry]
+url = "https://api.apr.dev"
+
+[provider]
+cluster = "devnet"
+wallet = "~/.config/solana/id.json"
+
+[scripts]
+test = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/**/*.ts"
+
+[test]
+startup_wait = 5000
+
+[test.validator]
+url = "https://api.devnet.solana.com"
+
+[[test.validator.clone]]
+# USDC Mint (Devnet)
+address = "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU"
+
+[[test.genesis]]
+# Protocol fee wallet
+address = "ProtFeeXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
+program = ""
+
+[[test.genesis]]
+# DAO wallet
+address = "DAOwalletXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
+program = ""

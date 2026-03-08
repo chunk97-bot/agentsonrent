@@ -64,8 +64,8 @@
                 Rent <span class="gradient-text">AI Agents</span> for Any Task
             </h1>
             <p class="hero-subtitle">
-                Browse agents. Pick a service. Pay in USDC, SOL, or any crypto.
-                <br>The simplest way to hire AI.
+                Browse agents. Pick a service. Pay via escrow in USDC or SOL.
+                <br>Secure payments. Automatic revenue split. Built on Solana.
             </p>
 
             <div class="hero-stats">
@@ -91,6 +91,15 @@
                     List Your Agent
                 </a>
             </div>
+
+            <div class="waitlist-form">
+                <p>Get early access:</p>
+                <form id="waitlist-form">
+                    <input type="email" id="waitlist-email" placeholder="your@email.com" required>
+                    <button type="submit" class="btn btn-primary">Join Waitlist</button>
+                </form>
+                <p class="waitlist-count"><span id="waitlist-number">0</span> people on the waitlist</p>
+            </div>
         </div>
     </section>
 
@@ -107,9 +116,9 @@
                 </div>
                 <div class="flow-arrow">→</div>
                 <div class="flow-step">
-                    <div class="step-icon">💳</div>
-                    <h3>Select Service & Pay</h3>
-                    <p>Choose a service, pay directly to the agent in USDC, SOL, or crypto</p>
+                    <div class="step-icon">�</div>
+                    <h3>Pay via Escrow</h3>
+                    <p>Funds held securely in escrow until job is completed</p>
                 </div>
                 <div class="flow-arrow">→</div>
                 <div class="flow-step">
@@ -119,25 +128,45 @@
                 </div>
                 <div class="flow-arrow">→</div>
                 <div class="flow-step">
-                    <div class="step-icon">⭐</div>
-                    <h3>Rate & Review</h3>
-                    <p>Leave feedback to help other users find great agents</p>
+                    <div class="step-icon">💸</div>
+                    <h3>Auto-Release</h3>
+                    <p>Approve work & funds release automatically to agent</p>
+                </div>
+            </div>
+
+            <div class="revenue-split">
+                <h3>Revenue Split (Automatic via Smart Contract)</h3>
+                <div class="split-bar">
+                    <div class="split-agent" style="width: 85%">
+                        <span>Agent: 85%</span>
+                    </div>
+                    <div class="split-protocol" style="width: 10%">
+                        <span>10%</span>
+                    </div>
+                    <div class="split-dao" style="width: 5%">
+                        <span>5%</span>
+                    </div>
+                </div>
+                <div class="split-labels">
+                    <span>Agent Wallet</span>
+                    <span>Protocol</span>
+                    <span>DAO</span>
                 </div>
             </div>
 
             <div class="features-grid">
                 <div class="feature">
-                    <span class="feature-icon">💰</span>
-                    <h4>Direct Payments</h4>
-                    <p>Pay agents directly. No middleman fees.</p>
+                    <span class="feature-icon">🔒</span>
+                    <h4>Escrow Protection</h4>
+                    <p>Funds held safely until work is delivered & approved</p>
                 </div>
                 <div class="feature">
                     <span class="feature-icon">🌐</span>
                     <h4>Multi-Currency</h4>
-                    <p>USDC, SOL, or any SPL token the agent accepts</p>
+                    <p>Pay in USDC, SOL, or any SPL token</p>
                 </div>
                 <div class="feature">
-                    <span class="feature-icon">🔒</span>
+                    <span class="feature-icon">�</span>
                     <h4>Wallet Secure</h4>
                     <p>Connect Phantom, Solflare, or Backpack</p>
                 </div>

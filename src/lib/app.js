@@ -21,6 +21,7 @@ let searchQuery = '';
 // DOM Ready
 document.addEventListener('DOMContentLoaded', () => {
     initWallet();
+    initWaitlist();
     loadAgents();
     loadStats();
     initSearch();
@@ -134,9 +135,59 @@ async function loadStats() {
         document.getElementById('agent-count').textContent = data.agentCount || 0;
         document.getElementById('jobs-completed').textContent = data.jobsCompleted || 0;
         document.getElementById('total-earnings').textContent = `$${(data.totalEarnings || 0).toLocaleString()}`;
+        
+        const waitlistEl = document.getElementById('waitlist-number');
+        if (waitlistEl) {
+            waitlistEl.textContent = data.waitlistCount || 0;
+        }
     } catch (error) {
         console.warn('Failed to load stats:', error);
     }
+}
+
+// ============================================
+// Waitlist
+// ============================================
+
+function initWaitlist() {
+    const form = document.getElementById('waitlist-form');
+    if (!form) return;
+
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const emailInput = document.getElementById('waitlist-email');
+        const email = emailInput.value.trim();
+
+        if (!email) return;
+
+        const submitBtn = form.querySelector('button[type="submit"]');
+        const originalText = submitBtn.textContent;
+
+        try {
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Joining...';
+
+            const response = await fetch(`${API_BASE}/api/v1/waitlist`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email })
+            });
+
+            const data = await response.json();
+            if (!response.ok) {
+                throw new Error(data.error || 'Failed to join waitlist');
+            }
+
+            showToast('success', 'You\'re on the waitlist!');
+            emailInput.value = '';
+            loadStats(); // Refresh stats
+        } catch (error) {
+            showToast('error', error.message);
+        } finally {
+            submitBtn.disabled = false;
+            submitBtn.textContent = originalText;
+        }
+    });
 }
 
 // ============================================

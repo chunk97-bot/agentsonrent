@@ -1,11 +1,11 @@
 /**
- * AgentRent - Cloudflare Worker API (Simplified)
- * Clean agent rental marketplace
+ * AgentRent - Cloudflare Worker API
+ * AI Agent Rental Marketplace
  * 
  * - Agents register with profile + services
- * - Users rent agents and pay directly
+ * - Users rent agents via escrow payments
+ * - Revenue split: 85% Agent / 10% Protocol / 5% DAO
  * - Supports USDC, SOL, or any SPL token
- * - No token-gating, no escrow, no protocol fees
  */
 
 // CORS configuration
@@ -24,7 +24,7 @@ function getCorsHeaders(request) {
     return {
         'Access-Control-Allow-Origin': allowedOrigin,
         'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type, X-Wallet-Address',
+        'Access-Control-Allow-Headers': 'Content-Type, X-Wallet-Address, X-Signature',
         'Access-Control-Allow-Credentials': 'true',
         'Content-Type': 'application/json'
     };
@@ -198,6 +198,16 @@ export default {
             // Stats
             if (path === '/api/v1/stats' && method === 'GET') {
                 return await handleStats(env, corsHeaders);
+            }
+
+            // Protocol config
+            if (path === '/api/v1/config' && method === 'GET') {
+                return await handleConfig(env, corsHeaders);
+            }
+
+            // Waitlist
+            if (path === '/api/v1/waitlist' && method === 'POST') {
+                return await handleWaitlist(request, env, corsHeaders);
             }
 
             return jsonResponse({ error: 'Not found' }, 404, corsHeaders);
@@ -687,10 +697,75 @@ async function handleStats(env, corsHeaders) {
     const completedJobs = jobs.filter(j => j.status === 'completed');
     const totalEarnings = completedJobs.reduce((sum, j) => sum + (j.service?.price || 0), 0);
 
+    // Get waitlist count
+    let waitlistCount = 0;
+    try {
+        const waitlistResult = await env.WAITLIST.list({ limit: 1000 });
+        waitlistCount = waitlistResult.keys.length;
+    } catch (e) {
+        // WAITLIST KV may not exist
+    }
+
     return jsonResponse({
         agentCount: agents.length,
         jobsCompleted: completedJobs.length,
         totalEarnings,
-        activeJobs: jobs.filter(j => ['pending', 'in_progress', 'delivered'].includes(j.status)).length
+        activeJobs: jobs.filter(j => ['pending', 'in_progress', 'delivered'].includes(j.status)).length,
+        waitlistCount
+    }, 200, corsHeaders);
+}
+
+// ============================================
+// Protocol Config
+// ============================================
+
+async function handleConfig(env, corsHeaders) {
+    return jsonResponse({
+        protocol: {
+            name: 'AgentRent',
+            version: '1.0.0'
+        },
+        escrow: {
+            programId: env.ESCROW_PROGRAM_ID || null,
+            deployed: !!env.ESCROW_PROGRAM_ID
+        },
+        wallets: {
+            protocol: env.PROTOCOL_WALLET || null,
+            dao: env.DAO_WALLET || null,
+            configured: !!(env.PROTOCOL_WALLET && env.DAO_WALLET)
+        },
+        tokens: {
+            usdc: env.USDC_MINT || 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v'
+        },
+        fees: {
+            agent: 85,
+            protocol: 10,
+            dao: 5
+        }
+    }, 200, corsHeaders);
+}
+
+// ============================================
+// Waitlist
+// ============================================
+
+async function handleWaitlist(request, env, corsHeaders) {
+    const { email } = await request.json();
+
+    if (!email || !email.includes('@')) {
+        return jsonResponse({ error: 'Invalid email' }, 400, corsHeaders);
+    }
+
+    // Store in KV
+    await env.WAITLIST.put(email, JSON.stringify({ joined: Date.now() }));
+
+    // Get position
+    const listResult = await env.WAITLIST.list({ limit: 1000 });
+    const position = listResult.keys.length;
+
+    return jsonResponse({
+        success: true,
+        message: 'Added to waitlist',
+        position
     }, 200, corsHeaders);
 }
