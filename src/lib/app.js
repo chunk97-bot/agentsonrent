@@ -9,6 +9,101 @@ import { showToast, formatAddress, formatRating, escapeHtml } from './utils.js';
 // API base URL
 const API_BASE = 'https://agentrent-api.chunky199701.workers.dev';
 
+// Demo agents (shown when no agents are registered yet)
+const DEMO_AGENTS = [
+    {
+        id: 'demo_tax_1',
+        name: 'TaxBot Pro',
+        description: 'AI-powered tax preparation and filing assistant. Handles W-2, 1099, deductions, and crypto tax reporting.',
+        avatar: '📊',
+        category: 'tax',
+        wallet: 'demo',
+        isOnline: true,
+        isDemo: true,
+        stats: { rating: 4.8, reviewCount: 127, jobsCompleted: 245 },
+        services: [
+            { id: 'svc1', name: 'Tax Return Review', price: 25, currency: 'USDC', deliveryHours: 24 },
+            { id: 'svc2', name: 'Full Tax Filing', price: 75, currency: 'USDC', deliveryHours: 48 }
+        ]
+    },
+    {
+        id: 'demo_legal_1',
+        name: 'LegalMind AI',
+        description: 'Contract review, legal document drafting, and compliance analysis. Not legal advice, but smart assistance.',
+        avatar: '⚖️',
+        category: 'legal',
+        wallet: 'demo',
+        isOnline: true,
+        isDemo: true,
+        stats: { rating: 4.9, reviewCount: 89, jobsCompleted: 156 },
+        services: [
+            { id: 'svc1', name: 'Contract Review', price: 50, currency: 'USDC', deliveryHours: 12 },
+            { id: 'svc2', name: 'NDA Drafting', price: 35, currency: 'USDC', deliveryHours: 6 }
+        ]
+    },
+    {
+        id: 'demo_code_1',
+        name: 'CodeWhiz',
+        description: 'Full-stack developer agent. React, Node, Python, Solidity. Bug fixes, code reviews, and new features.',
+        avatar: '💻',
+        category: 'code',
+        wallet: 'demo',
+        isOnline: true,
+        isDemo: true,
+        stats: { rating: 4.7, reviewCount: 203, jobsCompleted: 412 },
+        services: [
+            { id: 'svc1', name: 'Code Review', price: 20, currency: 'USDC', deliveryHours: 4 },
+            { id: 'svc2', name: 'Bug Fix', price: 40, currency: 'USDC', deliveryHours: 12 },
+            { id: 'svc3', name: 'Feature Development', price: 100, currency: 'USDC', deliveryHours: 48 }
+        ]
+    },
+    {
+        id: 'demo_research_1',
+        name: 'ResearchGPT',
+        description: 'Deep research on any topic. Market analysis, competitor intel, academic literature reviews.',
+        avatar: '🔬',
+        category: 'research',
+        wallet: 'demo',
+        isOnline: true,
+        isDemo: true,
+        stats: { rating: 4.6, reviewCount: 67, jobsCompleted: 134 },
+        services: [
+            { id: 'svc1', name: 'Quick Research', price: 15, currency: 'USDC', deliveryHours: 2 },
+            { id: 'svc2', name: 'Deep Dive Report', price: 60, currency: 'USDC', deliveryHours: 24 }
+        ]
+    },
+    {
+        id: 'demo_creative_1',
+        name: 'ArtForge',
+        description: 'Creative content generation. Logos, illustrations, social media graphics, and brand assets.',
+        avatar: '🎨',
+        category: 'creative',
+        wallet: 'demo',
+        isOnline: false,
+        isDemo: true,
+        stats: { rating: 4.5, reviewCount: 45, jobsCompleted: 89 },
+        services: [
+            { id: 'svc1', name: 'Logo Design', price: 30, currency: 'USDC', deliveryHours: 24 },
+            { id: 'svc2', name: 'Social Graphics Pack', price: 45, currency: 'USDC', deliveryHours: 12 }
+        ]
+    },
+    {
+        id: 'demo_writing_1',
+        name: 'WordSmith Pro',
+        description: 'Professional writing agent. Blog posts, landing pages, emails, and technical documentation.',
+        avatar: '✍️',
+        category: 'writing',
+        wallet: 'demo',
+        isOnline: true,
+        isDemo: true,
+        stats: { rating: 4.8, reviewCount: 156, jobsCompleted: 298 },
+        services: [
+            { id: 'svc1', name: 'Blog Post', price: 25, currency: 'USDC', deliveryHours: 6 },
+            { id: 'svc2', name: 'Landing Page Copy', price: 40, currency: 'USDC', deliveryHours: 12 }
+        ]
+    }
+];
+
 // Initialize wallet
 const wallet = new WalletAdapter();
 
@@ -207,10 +302,29 @@ async function loadAgents() {
         const data = await response.json();
 
         agents = data.agents || [];
+        
+        // Use demo agents if no real agents exist (and no search/filter active)
+        if (agents.length === 0 && !searchQuery && !currentCategory) {
+            agents = DEMO_AGENTS;
+        } else if (agents.length === 0 && currentCategory) {
+            // Filter demo agents by category
+            agents = DEMO_AGENTS.filter(a => a.category === currentCategory);
+        } else if (agents.length === 0 && searchQuery) {
+            // Search in demo agents
+            const q = searchQuery.toLowerCase();
+            agents = DEMO_AGENTS.filter(a => 
+                a.name.toLowerCase().includes(q) || 
+                a.description.toLowerCase().includes(q) ||
+                a.category.toLowerCase().includes(q)
+            );
+        }
+        
         renderAgents();
     } catch (error) {
         console.error('Failed to load agents:', error);
-        grid.innerHTML = '<div class="error-message">Failed to load agents. Please try again.</div>';
+        // Fall back to demo agents on error
+        agents = DEMO_AGENTS;
+        renderAgents();
     }
 }
 
@@ -228,7 +342,8 @@ function renderAgents() {
     }
 
     grid.innerHTML = agents.map(agent => `
-        <div class="agent-card" data-agent-id="${escapeHtml(agent.id)}">
+        <div class="agent-card${agent.isDemo ? ' demo-agent' : ''}" data-agent-id="${escapeHtml(agent.id)}">
+            ${agent.isDemo ? '<span class="demo-badge">Demo</span>' : ''}
             <div class="agent-header">
                 <span class="agent-avatar">${escapeHtml(agent.avatar)}</span>
                 <div class="agent-info">
@@ -250,8 +365,8 @@ function renderAgents() {
                     </div>
                 `).join('')}
             </div>
-            <button class="btn btn-primary btn-rent" onclick="openRentModal('${escapeHtml(agent.id)}')">
-                Rent Agent
+            <button class="btn ${agent.isDemo ? 'btn-secondary' : 'btn-primary'} btn-rent" onclick="openRentModal('${escapeHtml(agent.id)}')">
+                ${agent.isDemo ? 'Preview Agent' : 'Rent Agent'}
             </button>
         </div>
     `).join('');
@@ -308,17 +423,49 @@ function closeModal(modalId) {
 
 // Global functions for onclick handlers
 window.openRentModal = function(agentId) {
-    if (!currentWallet) {
-        showToast('warning', 'Please connect your wallet first');
-        document.getElementById('wallet-modal').classList.remove('hidden');
-        return;
-    }
-
     const agent = agents.find(a => a.id === agentId);
     if (!agent) return;
 
     const modal = document.getElementById('rent-modal');
     const content = modal.querySelector('.modal-body');
+
+    // Handle demo agents
+    if (agent.isDemo) {
+        content.innerHTML = `
+            <h2>${escapeHtml(agent.name)} <span class="demo-badge" style="font-size: 0.5em;">Demo</span></h2>
+            <p class="demo-notice" style="background: rgba(255, 193, 7, 0.1); padding: 1rem; border-radius: 8px; margin-bottom: 1rem;">
+                <strong>⚠️ This is a demo agent</strong><br>
+                Real agents will be available once the marketplace launches. 
+                <a href="#list-agent" onclick="closeModal('rent-modal')">List your own agent</a> to be first!
+            </p>
+            <h3>Services Offered:</h3>
+            <div class="services-list">
+                ${(agent.services || []).map(s => `
+                    <div class="service-option demo-service">
+                        <div class="service-details">
+                            <strong>${escapeHtml(s.name)}</strong>
+                        </div>
+                        <div class="service-price">
+                            <span class="price">${s.price} ${s.currency}</span>
+                            <span class="delivery">Delivery: ${s.deliveryHours}h</span>
+                        </div>
+                    </div>
+                `).join('')}
+            </div>
+            <p style="margin-top: 1rem; color: var(--text-muted);">
+                Rating: ${formatRating(agent.stats?.rating || 0)} · ${agent.stats?.jobsCompleted || 0} jobs completed
+            </p>
+        `;
+        modal.classList.remove('hidden');
+        return;
+    }
+
+    // Real agents require wallet
+    if (!currentWallet) {
+        showToast('warning', 'Please connect your wallet first');
+        document.getElementById('wallet-modal').classList.remove('hidden');
+        return;
+    }
 
     content.innerHTML = `
         <h2>Rent ${escapeHtml(agent.name)}</h2>

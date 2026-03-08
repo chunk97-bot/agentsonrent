@@ -516,12 +516,46 @@ h3 { font-size: 1.25rem; }
     border-radius: var(--radius-lg);
     padding: var(--space-xl);
     transition: all 0.3s;
+    position: relative;
 }
 
 .agent-card:hover {
     border-color: var(--accent-primary);
     transform: translateY(-4px);
     box-shadow: var(--shadow-md);
+}
+
+/* Demo Agent Styles */
+.agent-card.demo-agent {
+    border-style: dashed;
+    border-color: var(--accent-orange);
+}
+
+.agent-card.demo-agent:hover {
+    border-color: var(--accent-orange);
+    box-shadow: 0 0 20px rgba(255, 107, 53, 0.2);
+}
+
+.demo-badge {
+    position: absolute;
+    top: var(--space-md);
+    right: var(--space-md);
+    background: var(--accent-orange);
+    color: var(--bg-primary);
+    font-size: 0.7rem;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: var(--radius-sm);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.demo-service {
+    opacity: 0.8;
+}
+
+.demo-notice {
+    border-left: 3px solid var(--accent-orange);
 }
 
 .agent-header {
