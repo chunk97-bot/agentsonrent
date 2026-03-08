@@ -52,8 +52,9 @@ async function loadAgentData() {
     }
 
     try {
-        // For demo, use mock data
-        agentData = getMockAgentData();
+        // Fetch agent data from API
+        const response = await api.getAgent(agentId);
+        agentData = response.agent;
 
         // Update UI with agent data
         updateAgentProfile();
@@ -70,66 +71,9 @@ async function loadAgentData() {
     }
 }
 
-// Mock data for demo
-function getMockAgentData() {
-    return {
-        id: 'agent_demo123',
-        wallet: wallet.getAddress() || 'So1ana...xyz',
-        profile: {
-            name: 'DataCrunch AI',
-            description: 'Expert data analysis and visualization agent',
-            avatar: '📊',
-            category: 'data'
-        },
-        services: [
-            { id: 'svc_1', name: 'Data Cleaning', price: 20, currency: 'USDC', deliveryHours: 12, description: 'Clean and normalize your dataset', agentRentable: true },
-            { id: 'svc_2', name: 'Analysis Report', price: 50, currency: 'USDC', deliveryHours: 24, description: 'Full statistical analysis with insights', agentRentable: true },
-            { id: 'svc_3', name: 'Visualization', price: 30, currency: 'USDC', deliveryHours: 8, description: 'Charts and graphs from your data', agentRentable: false }
-        ],
-        settings: {
-            allowAgentRentals: true,
-            autoAcceptFromAgents: ['agent_trusted1'],
-            maxConcurrentJobs: 10
-        },
-        stats: {
-            rating: 4.8,
-            reviewCount: 47,
-            jobsCompleted: 156,
-            totalEarnings: 4250.00,
-            agentJobsProvided: 23,
-            agentJobsRented: 8
-        },
-        isOnline: true
-    };
-}
-
-function getMockJobs() {
-    return [
-        { id: 'job_001', serviceName: 'Data Cleaning', renterType: 'user', renterWallet: 'User1...abc', budget: 20, status: 'pending', createdAt: Date.now() - 3600000 },
-        { id: 'job_002', serviceName: 'Analysis Report', renterType: 'agent', renterAgentId: 'agent_legal123', budget: 50, status: 'accepted', createdAt: Date.now() - 86400000 },
-        { id: 'job_003', serviceName: 'Visualization', renterType: 'user', renterWallet: 'User2...def', budget: 30, status: 'delivered', createdAt: Date.now() - 172800000 },
-        { id: 'job_004', serviceName: 'Data Cleaning', renterType: 'agent', renterAgentId: 'agent_research456', budget: 20, status: 'approved', createdAt: Date.now() - 259200000 }
-    ];
-}
-
-function getMockSubcontracts() {
-    return [
-        { id: 'sub_001', agentId: 'agent_chart123', serviceName: 'Chart Generation', budget: 15, status: 'approved', createdAt: Date.now() - 86400000 },
-        { id: 'sub_002', agentId: 'agent_ml789', serviceName: 'ML Prediction', budget: 45, status: 'delivered', createdAt: Date.now() - 172800000 }
-    ];
-}
-
-function getMockReviews() {
-    return [
-        { id: 'rev_1', reviewerType: 'user', reviewerWallet: 'User1...abc', rating: 5, comment: 'Excellent data analysis! Very detailed report.', createdAt: Date.now() - 86400000 },
-        { id: 'rev_2', reviewerType: 'agent', reviewerAgentId: 'agent_legal123', rating: 5, comment: 'Fast and accurate. Will use again for research.', createdAt: Date.now() - 172800000 },
-        { id: 'rev_3', reviewerType: 'user', reviewerWallet: 'User3...ghi', rating: 4, comment: 'Good work, minor delay but quality was great.', createdAt: Date.now() - 259200000 }
-    ];
-}
-
 // Update agent profile card
 function updateAgentProfile() {
-    document.getElementById('agent-avatar').textContent = agentData.profile.avatar;
+    document.getElementById('agent-avatar').textContent = agentData.profile.avatar || '🤖';
     document.getElementById('agent-name').textContent = agentData.profile.name;
     document.getElementById('agent-category').textContent = capitalize(agentData.profile.category);
 
@@ -148,10 +92,8 @@ function updateStats() {
     document.getElementById('total-earnings').textContent = formatPrice(agentData.stats.totalEarnings);
     document.getElementById('jobs-completed').textContent = agentData.stats.jobsCompleted;
     document.getElementById('avg-rating').textContent = agentData.stats.rating.toFixed(1);
-
-    const jobs = getMockJobs();
-    const activeJobs = jobs.filter(j => ['pending', 'accepted', 'in_progress'].includes(j.status));
-    document.getElementById('active-jobs').textContent = activeJobs.length;
+    // Active jobs count will be updated after loadJobs
+    document.getElementById('active-jobs').textContent = '...';
 
     // Load token fees (Bags.fm integration)
     loadTokenFees();
@@ -170,20 +112,28 @@ async function loadTokenFees() {
     }
 
     try {
-        // Get agent's token info
+        // Get agent's token info from API
         const agentId = api.currentAgentId || localStorage.getItem('agentrent_current_agent');
+        const tokenInfo = await api.getAgentToken(agentId);
         
-        // For demo, use mock data
-        // In production: const tokenInfo = await api.getAgentToken(agentId);
-        const mockTokenMint = agentData.token?.mint || 'Demo...Token';
-        const mockClaimable = 12.50;
-        const mockLifetime = 45.00;
+        if (!tokenInfo.hasToken) {
+            mintEl.textContent = 'No token';
+            claimableEl.textContent = '$0.00';
+            lifetimeEl.textContent = '$0.00';
+            return;
+        }
 
-        mintEl.textContent = formatAddress(mockTokenMint);
-        claimableEl.textContent = formatPrice(mockClaimable);
-        lifetimeEl.textContent = formatPrice(mockLifetime);
+        mintEl.textContent = formatAddress(tokenInfo.token.mint);
+        
+        // Get claimable fees
+        const claimable = await api.getClaimableFees(wallet.getAddress());
+        const claimableAmount = claimable.claimable || 0;
+        const lifetimeAmount = tokenInfo.lifetimeFees?.total || 0;
 
-        if (mockClaimable > 0) {
+        claimableEl.textContent = formatPrice(claimableAmount);
+        lifetimeEl.textContent = formatPrice(lifetimeAmount);
+
+        if (claimableAmount > 0) {
             claimBtn.disabled = false;
         }
 
@@ -200,13 +150,17 @@ window.claimTokenFees = async function() {
     claimBtn.textContent = 'Claiming...';
 
     try {
-        // In production: const result = await api.claimFees(wallet.getAddress());
-        // Then sign the transaction with wallet
+        // Get claim transaction from API
+        const result = await api.claimFees(wallet.getAddress());
         
-        // For demo, simulate success
-        await new Promise(resolve => setTimeout(resolve, 1500));
+        // Sign and send transaction with wallet
+        if (result.transaction) {
+            const signature = await wallet.signAndSendTransaction(result.transaction);
+            showToast(`Fees claimed! TX: ${formatAddress(signature)}`, 'success');
+        } else {
+            showToast('Fees claimed successfully!', 'success');
+        }
         
-        showToast('Fees claimed successfully!', 'success');
         document.getElementById('claimable-fees').textContent = '$0.00';
         claimBtn.textContent = 'Claimed!';
         
@@ -226,7 +180,13 @@ window.claimTokenFees = async function() {
 
 // Load and render jobs
 async function loadJobs() {
-    const jobs = getMockJobs();
+    const agentId = api.currentAgentId || localStorage.getItem('agentrent_current_agent');
+    const response = await api.getAgentJobs(agentId);
+    const jobs = response.jobs || [];
+
+    // Update active jobs count
+    const activeJobs = jobs.filter(j => ['pending', 'accepted', 'in_progress'].includes(j.status));
+    document.getElementById('active-jobs').textContent = activeJobs.length;
 
     // Pending jobs list (overview)
     const pendingJobs = jobs.filter(j => j.status === 'pending');
@@ -319,7 +279,9 @@ async function loadServices() {
 
 // Load subcontracts
 async function loadSubcontracts() {
-    const subcontracts = getMockSubcontracts();
+    const agentId = api.currentAgentId || localStorage.getItem('agentrent_current_agent');
+    const response = await api.getAgentSubcontracts(agentId);
+    const subcontracts = response.subcontracts || [];
 
     document.getElementById('subcontract-count').textContent = subcontracts.length;
     document.getElementById('subcontract-spent').textContent = formatPrice(
@@ -349,10 +311,14 @@ async function loadSubcontracts() {
 
 // Load reviews
 async function loadReviews() {
-    const reviews = getMockReviews();
+    const agentId = api.currentAgentId || localStorage.getItem('agentrent_current_agent');
+    const response = await api.getAgentReviews(agentId);
+    const reviews = response.reviews || [];
 
     // Summary
-    const avgRating = reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length;
+    const avgRating = reviews.length > 0 
+        ? reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length 
+        : 0;
     document.getElementById('review-avg').textContent = avgRating.toFixed(1);
     document.getElementById('review-count').textContent = `${reviews.length} reviews`;
     document.getElementById('review-stars').textContent = '★'.repeat(Math.round(avgRating)) + '☆'.repeat(5 - Math.round(avgRating));

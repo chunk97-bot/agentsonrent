@@ -8,13 +8,27 @@
  * - Creator fee claiming for agents
  */
 
-// CORS headers
-const CORS_HEADERS = {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type, X-Signature, X-Agent-Id',
-    'Content-Type': 'application/json'
-};
+// CORS configuration
+const ALLOWED_ORIGINS = [
+    'https://agentsonrent.org',
+    'https://www.agentsonrent.org',
+    'http://localhost:3000',
+    'http://localhost:5173',
+    'http://127.0.0.1:5500'
+];
+
+function getCorsHeaders(request) {
+    const origin = request.headers.get('Origin');
+    const allowedOrigin = ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
+    
+    return {
+        'Access-Control-Allow-Origin': allowedOrigin,
+        'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type, X-Signature, X-Agent-Id',
+        'Access-Control-Allow-Credentials': 'true',
+        'Content-Type': 'application/json'
+    };
+}
 
 // Bags.fm API Configuration
 const BAGS_API_BASE = 'https://api.bags.fm/v1';
@@ -132,20 +146,104 @@ async function bagsConfigureFeeShare(tokenMint, creator, claimers, env) {
     return response.json();
 }
 
-// In-memory store (replace with KV in production)
-const STORE = {
-    agents: new Map(),
-    jobs: new Map(),
-    reviews: new Map(),
-    waitlist: new Set(),
-    balances: new Map() // Token balances for access check simulation
-};
+// ============================================
+// KV Storage Helpers
+// ============================================
+
+/**
+ * Get an agent from KV storage
+ */
+async function getAgentFromKV(agentId, env) {
+    const data = await env.AGENTS.get(agentId, 'json');
+    return data;
+}
+
+/**
+ * Store an agent in KV storage
+ */
+async function putAgentToKV(agentId, agent, env) {
+    await env.AGENTS.put(agentId, JSON.stringify(agent));
+}
+
+/**
+ * Get a job from KV storage
+ */
+async function getJobFromKV(jobId, env) {
+    const data = await env.JOBS.get(jobId, 'json');
+    return data;
+}
+
+/**
+ * Store a job in KV storage
+ */
+async function putJobToKV(jobId, job, env) {
+    await env.JOBS.put(jobId, JSON.stringify(job));
+}
+
+/**
+ * Get agent reviews from KV storage
+ */
+async function getReviewsFromKV(agentId, env) {
+    const data = await env.REVIEWS.get(agentId, 'json');
+    return data || [];
+}
+
+/**
+ * Store agent reviews in KV storage
+ */
+async function putReviewsToKV(agentId, reviews, env) {
+    await env.REVIEWS.put(agentId, JSON.stringify(reviews));
+}
+
+/**
+ * List all agents from KV (with pagination via cursor)
+ */
+async function listAgentsFromKV(env, limit = 100) {
+    const agents = [];
+    let cursor = null;
+    
+    do {
+        const result = await env.AGENTS.list({ limit: Math.min(limit, 1000), cursor });
+        
+        for (const key of result.keys) {
+            const agent = await env.AGENTS.get(key.name, 'json');
+            if (agent) agents.push(agent);
+        }
+        
+        cursor = result.list_complete ? null : result.cursor;
+    } while (cursor && agents.length < limit);
+    
+    return agents;
+}
+
+/**
+ * List all jobs from KV
+ */
+async function listJobsFromKV(env, limit = 1000) {
+    const jobs = [];
+    let cursor = null;
+    
+    do {
+        const result = await env.JOBS.list({ limit: Math.min(limit, 1000), cursor });
+        
+        for (const key of result.keys) {
+            const job = await env.JOBS.get(key.name, 'json');
+            if (job) jobs.push(job);
+        }
+        
+        cursor = result.list_complete ? null : result.cursor;
+    } while (cursor && jobs.length < limit);
+    
+    return jobs;
+}
 
 export default {
     async fetch(request, env, ctx) {
+        const corsHeaders = getCorsHeaders(request);
+        
         // Handle CORS preflight
         if (request.method === 'OPTIONS') {
-            return new Response(null, { headers: CORS_HEADERS });
+            return new Response(null, { headers: corsHeaders });
         }
 
         const url = new URL(request.url);
@@ -154,25 +252,25 @@ export default {
         try {
             // Route requests
             if (path.startsWith('/api/v1/agents')) {
-                return await handleAgents(request, path, env);
+                return await handleAgents(request, path, env, corsHeaders);
             }
             if (path.startsWith('/api/v1/jobs')) {
-                return await handleJobs(request, path, env);
+                return await handleJobs(request, path, env, corsHeaders);
             }
             if (path.startsWith('/api/v1/bags')) {
-                return await handleBags(request, path, env);
+                return await handleBags(request, path, env, corsHeaders);
             }
             if (path.startsWith('/api/v1/access')) {
-                return await handleAccessCheck(request, path, env);
+                return await handleAccessCheck(request, path, env, corsHeaders);
             }
             if (path.startsWith('/api/v1/waitlist')) {
-                return await handleWaitlist(request, env);
+                return await handleWaitlist(request, env, corsHeaders);
             }
 
-            return jsonResponse({ error: 'Not found' }, 404);
+            return jsonResponse({ error: 'Not found' }, 404, corsHeaders);
         } catch (error) {
             console.error('API Error:', error);
-            return jsonResponse({ error: error.message }, 500);
+            return jsonResponse({ error: error.message }, 500, corsHeaders);
         }
     }
 };
@@ -181,13 +279,13 @@ export default {
 // Agent Routes
 // ============================================
 
-async function handleAgents(request, path, env) {
+async function handleAgents(request, path, env, corsHeaders) {
     const method = request.method;
 
     // POST /api/v1/agents/register - Agent self-registration
     if (path === '/api/v1/agents/register' && method === 'POST') {
         const body = await request.json();
-        return await registerAgent(body, env);
+        return await registerAgent(body, env, corsHeaders);
     }
 
     // GET /api/v1/agents - List all agents
@@ -200,20 +298,20 @@ async function handleAgents(request, path, env) {
             offset: parseInt(url.searchParams.get('offset') || '0'),
             canRentByAgents: url.searchParams.get('agentRentable') === 'true'
         };
-        return await listAgents(filters, env);
+        return await listAgents(filters, env, corsHeaders);
     }
 
     // GET /api/v1/agents/:id - Get single agent
     const agentMatch = path.match(/^\/api\/v1\/agents\/([^\/]+)$/);
     if (agentMatch && method === 'GET') {
-        return await getAgent(agentMatch[1], env);
+        return await getAgent(agentMatch[1], env, corsHeaders);
     }
 
     // PUT /api/v1/agents/:id - Update agent
     if (agentMatch && method === 'PUT') {
         const signature = request.headers.get('X-Signature');
         const body = await request.json();
-        return await updateAgent(agentMatch[1], body, signature, env);
+        return await updateAgent(agentMatch[1], body, signature, env, corsHeaders);
     }
 
     // POST /api/v1/agents/:id/services - Add services
@@ -221,62 +319,62 @@ async function handleAgents(request, path, env) {
     if (servicesMatch && method === 'POST') {
         const signature = request.headers.get('X-Signature');
         const body = await request.json();
-        return await addServices(servicesMatch[1], body.services, signature, env);
+        return await addServices(servicesMatch[1], body.services, signature, env, corsHeaders);
     }
 
     // GET /api/v1/agents/:id/reviews - Get agent reviews
     const reviewsMatch = path.match(/^\/api\/v1\/agents\/([^\/]+)\/reviews$/);
     if (reviewsMatch && method === 'GET') {
-        return await getAgentReviews(reviewsMatch[1], env);
+        return await getAgentReviews(reviewsMatch[1], env, corsHeaders);
     }
 
     // GET /api/v1/agents/:id/earnings - Get agent earnings
     const earningsMatch = path.match(/^\/api\/v1\/agents\/([^\/]+)\/earnings$/);
     if (earningsMatch && method === 'GET') {
         const signature = request.headers.get('X-Signature');
-        return await getAgentEarnings(earningsMatch[1], signature, env);
+        return await getAgentEarnings(earningsMatch[1], signature, env, corsHeaders);
     }
 
-    return jsonResponse({ error: 'Agent route not found' }, 404);
+    return jsonResponse({ error: 'Agent route not found' }, 404, corsHeaders);
 }
 
 // ============================================
 // Job Routes
 // ============================================
 
-async function handleJobs(request, path, env) {
+async function handleJobs(request, path, env, corsHeaders) {
     const method = request.method;
 
     // POST /api/v1/jobs - Create job (user OR agent renting another agent)
     if (path === '/api/v1/jobs' && method === 'POST') {
         const body = await request.json();
         const agentId = request.headers.get('X-Agent-Id'); // If agent is renting
-        return await createJob(body, agentId, env);
+        return await createJob(body, agentId, env, corsHeaders);
     }
 
     // GET /api/v1/jobs/user/:wallet - Get user's jobs
     const userJobsMatch = path.match(/^\/api\/v1\/jobs\/user\/([^\/]+)$/);
     if (userJobsMatch && method === 'GET') {
-        return await getUserJobs(userJobsMatch[1], env);
+        return await getUserJobs(userJobsMatch[1], env, corsHeaders);
     }
 
     // GET /api/v1/jobs/agent/:id - Get agent's jobs (as provider)
     const agentJobsMatch = path.match(/^\/api\/v1\/jobs\/agent\/([^\/]+)$/);
     if (agentJobsMatch && method === 'GET') {
-        return await getAgentJobs(agentJobsMatch[1], env);
+        return await getAgentJobs(agentJobsMatch[1], env, corsHeaders);
     }
 
     // GET /api/v1/jobs/agent/:id/subcontracts - Jobs agent rented from others
     const subcontractsMatch = path.match(/^\/api\/v1\/jobs\/agent\/([^\/]+)\/subcontracts$/);
     if (subcontractsMatch && method === 'GET') {
-        return await getAgentSubcontracts(subcontractsMatch[1], env);
+        return await getAgentSubcontracts(subcontractsMatch[1], env, corsHeaders);
     }
 
     // POST /api/v1/jobs/:id/accept - Agent accepts job
     const acceptMatch = path.match(/^\/api\/v1\/jobs\/([^\/]+)\/accept$/);
     if (acceptMatch && method === 'POST') {
         const signature = request.headers.get('X-Signature');
-        return await acceptJob(acceptMatch[1], signature, env);
+        return await acceptJob(acceptMatch[1], signature, env, corsHeaders);
     }
 
     // POST /api/v1/jobs/:id/deliver - Agent delivers work
@@ -284,14 +382,14 @@ async function handleJobs(request, path, env) {
     if (deliverMatch && method === 'POST') {
         const signature = request.headers.get('X-Signature');
         const body = await request.json();
-        return await deliverWork(deliverMatch[1], body, signature, env);
+        return await deliverWork(deliverMatch[1], body, signature, env, corsHeaders);
     }
 
     // POST /api/v1/jobs/:id/approve - User/Agent approves work
     const approveMatch = path.match(/^\/api\/v1\/jobs\/([^\/]+)\/approve$/);
     if (approveMatch && method === 'POST') {
         const signature = request.headers.get('X-Signature');
-        return await approveWork(approveMatch[1], signature, env);
+        return await approveWork(approveMatch[1], signature, env, corsHeaders);
     }
 
     // POST /api/v1/jobs/:id/dispute - Dispute job
@@ -299,7 +397,7 @@ async function handleJobs(request, path, env) {
     if (disputeMatch && method === 'POST') {
         const signature = request.headers.get('X-Signature');
         const body = await request.json();
-        return await disputeJob(disputeMatch[1], body.reason, signature, env);
+        return await disputeJob(disputeMatch[1], body.reason, signature, env, corsHeaders);
     }
 
     // POST /api/v1/jobs/:id/review - Submit review
@@ -307,49 +405,51 @@ async function handleJobs(request, path, env) {
     if (reviewMatch && method === 'POST') {
         const signature = request.headers.get('X-Signature');
         const body = await request.json();
-        return await submitReview(reviewMatch[1], body, signature, env);
+        return await submitReview(reviewMatch[1], body, signature, env, corsHeaders);
     }
 
-    return jsonResponse({ error: 'Job route not found' }, 404);
+    return jsonResponse({ error: 'Job route not found' }, 404, corsHeaders);
 }
 
 // ============================================
 // Waitlist
 // ============================================
 
-async function handleWaitlist(request, env) {
+async function handleWaitlist(request, env, corsHeaders) {
     if (request.method === 'POST') {
         const { email } = await request.json();
 
         if (!email || !email.includes('@')) {
-            return jsonResponse({ error: 'Invalid email' }, 400);
+            return jsonResponse({ error: 'Invalid email' }, 400, corsHeaders);
         }
 
-        STORE.waitlist.add(email);
+        // Store in KV
+        await env.WAITLIST.put(email, JSON.stringify({ joined: Date.now() }));
 
-        // In production: store in KV
-        // await env.WAITLIST.put(email, JSON.stringify({ joined: Date.now() }));
+        // Get approximate count from KV list
+        const listResult = await env.WAITLIST.list({ limit: 1000 });
+        const position = listResult.keys.length;
 
         return jsonResponse({
             success: true,
             message: 'Added to waitlist',
-            position: STORE.waitlist.size
-        });
+            position
+        }, 200, corsHeaders);
     }
 
-    return jsonResponse({ error: 'Method not allowed' }, 405);
+    return jsonResponse({ error: 'Method not allowed' }, 405, corsHeaders);
 }
 
 // ============================================
 // Agent Operations
 // ============================================
 
-async function registerAgent(data, env) {
+async function registerAgent(data, env, corsHeaders) {
     const { wallet, signature, profile, services, settings } = data;
 
     // Validate required fields
     if (!wallet || !profile?.name) {
-        return jsonResponse({ error: 'Missing required fields: wallet, profile.name' }, 400);
+        return jsonResponse({ error: 'Missing required fields: wallet, profile.name' }, 400, corsHeaders);
     }
 
     // TODO: Verify signature in production
@@ -454,10 +554,8 @@ async function registerAgent(data, env) {
         updatedAt: Date.now()
     };
 
-    STORE.agents.set(agentId, agent);
-
-    // In production: store in KV
-    // await env.AGENTS.put(agentId, JSON.stringify(agent));
+    // Store in KV
+    await putAgentToKV(agentId, agent, env);
 
     return jsonResponse({
         success: true,
@@ -477,11 +575,11 @@ async function registerAgent(data, env) {
             'Agent registered successfully',
             'Token launch skipped (can be done later)'
         ]
-    }, 201);
+    }, 201, corsHeaders);
 }
 
-async function listAgents(filters, env) {
-    let agents = Array.from(STORE.agents.values());
+async function listAgents(filters, env, corsHeaders) {
+    let agents = await listAgentsFromKV(env, 500);
 
     // Filter by category
     if (filters.category) {
@@ -515,24 +613,24 @@ async function listAgents(filters, env) {
         total,
         limit: filters.limit,
         offset: filters.offset
-    });
+    }, 200, corsHeaders);
 }
 
-async function getAgent(agentId, env) {
-    const agent = STORE.agents.get(agentId);
+async function getAgent(agentId, env, corsHeaders) {
+    const agent = await getAgentFromKV(agentId, env);
 
     if (!agent) {
-        return jsonResponse({ error: 'Agent not found' }, 404);
+        return jsonResponse({ error: 'Agent not found' }, 404, corsHeaders);
     }
 
-    return jsonResponse({ agent: sanitizeAgent(agent) });
+    return jsonResponse({ agent: sanitizeAgent(agent) }, 200, corsHeaders);
 }
 
-async function updateAgent(agentId, data, signature, env) {
-    const agent = STORE.agents.get(agentId);
+async function updateAgent(agentId, data, signature, env, corsHeaders) {
+    const agent = await getAgentFromKV(agentId, env);
 
     if (!agent) {
-        return jsonResponse({ error: 'Agent not found' }, 404);
+        return jsonResponse({ error: 'Agent not found' }, 404, corsHeaders);
     }
 
     // TODO: Verify signature matches agent wallet
@@ -549,16 +647,16 @@ async function updateAgent(agentId, data, signature, env) {
     }
 
     agent.updatedAt = Date.now();
-    STORE.agents.set(agentId, agent);
+    await putAgentToKV(agentId, agent, env);
 
-    return jsonResponse({ success: true, agent: sanitizeAgent(agent) });
+    return jsonResponse({ success: true, agent: sanitizeAgent(agent) }, 200, corsHeaders);
 }
 
-async function addServices(agentId, services, signature, env) {
-    const agent = STORE.agents.get(agentId);
+async function addServices(agentId, services, signature, env, corsHeaders) {
+    const agent = await getAgentFromKV(agentId, env);
 
     if (!agent) {
-        return jsonResponse({ error: 'Agent not found' }, 404);
+        return jsonResponse({ error: 'Agent not found' }, 404, corsHeaders);
     }
 
     const newServices = services.map((s, i) => ({
@@ -573,26 +671,26 @@ async function addServices(agentId, services, signature, env) {
 
     agent.services.push(...newServices);
     agent.updatedAt = Date.now();
-    STORE.agents.set(agentId, agent);
+    await putAgentToKV(agentId, agent, env);
 
-    return jsonResponse({ success: true, services: newServices });
+    return jsonResponse({ success: true, services: newServices }, 200, corsHeaders);
 }
 
 // ============================================
 // Job Operations
 // ============================================
 
-async function createJob(data, rentingAgentId, env) {
+async function createJob(data, rentingAgentId, env, corsHeaders) {
     const { agentId, serviceId, userWallet, requirements, budget } = data;
 
-    const agent = STORE.agents.get(agentId);
+    const agent = await getAgentFromKV(agentId, env);
     if (!agent) {
-        return jsonResponse({ error: 'Agent not found' }, 404);
+        return jsonResponse({ error: 'Agent not found' }, 404, corsHeaders);
     }
 
     const service = agent.services.find(s => s.id === serviceId);
     if (!service) {
-        return jsonResponse({ error: 'Service not found' }, 404);
+        return jsonResponse({ error: 'Service not found' }, 404, corsHeaders);
     }
 
     // Check if this is agent-to-agent rental
@@ -600,19 +698,19 @@ async function createJob(data, rentingAgentId, env) {
 
     if (isAgentRental) {
         // Verify the renting agent exists
-        const rentingAgent = STORE.agents.get(rentingAgentId);
+        const rentingAgent = await getAgentFromKV(rentingAgentId, env);
         if (!rentingAgent) {
-            return jsonResponse({ error: 'Renting agent not found' }, 404);
+            return jsonResponse({ error: 'Renting agent not found' }, 404, corsHeaders);
         }
 
         // Check if target agent allows agent rentals
         if (!agent.settings.allowAgentRentals) {
-            return jsonResponse({ error: 'Agent does not accept rentals from other agents' }, 403);
+            return jsonResponse({ error: 'Agent does not accept rentals from other agents' }, 403, corsHeaders);
         }
 
         // Check if service is agent-rentable
         if (!service.agentRentable) {
-            return jsonResponse({ error: 'Service not available for agent-to-agent rental' }, 403);
+            return jsonResponse({ error: 'Service not available for agent-to-agent rental' }, 403, corsHeaders);
         }
     }
 
@@ -653,21 +751,23 @@ async function createJob(data, rentingAgentId, env) {
         job.deliveryDeadline = Date.now() + (service.deliveryHours * 60 * 60 * 1000);
     }
 
-    STORE.jobs.set(jobId, job);
+    await putJobToKV(jobId, job, env);
 
-    return jsonResponse({ success: true, job }, 201);
+    return jsonResponse({ success: true, job }, 201, corsHeaders);
 }
 
-async function getUserJobs(wallet, env) {
-    const jobs = Array.from(STORE.jobs.values())
+async function getUserJobs(wallet, env, corsHeaders) {
+    const allJobs = await listJobsFromKV(env);
+    const jobs = allJobs
         .filter(j => j.renterWallet === wallet)
         .sort((a, b) => b.createdAt - a.createdAt);
 
-    return jsonResponse({ jobs });
+    return jsonResponse({ jobs }, 200, corsHeaders);
 }
 
-async function getAgentJobs(agentId, env) {
-    const jobs = Array.from(STORE.jobs.values())
+async function getAgentJobs(agentId, env, corsHeaders) {
+    const allJobs = await listJobsFromKV(env);
+    const jobs = allJobs
         .filter(j => j.agentId === agentId)
         .sort((a, b) => b.createdAt - a.createdAt);
 
@@ -685,12 +785,13 @@ async function getAgentJobs(agentId, env) {
             inProgress: jobs.filter(j => ['accepted', 'in_progress'].includes(j.status)).length,
             completed: jobs.filter(j => j.status === 'approved').length
         }
-    });
+    }, 200, corsHeaders);
 }
 
-async function getAgentSubcontracts(agentId, env) {
+async function getAgentSubcontracts(agentId, env, corsHeaders) {
     // Jobs this agent rented from OTHER agents
-    const jobs = Array.from(STORE.jobs.values())
+    const allJobs = await listJobsFromKV(env);
+    const jobs = allJobs
         .filter(j => j.renterAgentId === agentId)
         .sort((a, b) => b.createdAt - a.createdAt);
 
@@ -698,41 +799,41 @@ async function getAgentSubcontracts(agentId, env) {
         subcontracts: jobs,
         total: jobs.length,
         totalSpent: jobs.reduce((sum, j) => sum + j.budget, 0)
-    });
+    }, 200, corsHeaders);
 }
 
-async function acceptJob(jobId, signature, env) {
-    const job = STORE.jobs.get(jobId);
+async function acceptJob(jobId, signature, env, corsHeaders) {
+    const job = await getJobFromKV(jobId, env);
 
     if (!job) {
-        return jsonResponse({ error: 'Job not found' }, 404);
+        return jsonResponse({ error: 'Job not found' }, 404, corsHeaders);
     }
 
     if (job.status !== 'pending') {
-        return jsonResponse({ error: 'Job already processed' }, 400);
+        return jsonResponse({ error: 'Job already processed' }, 400, corsHeaders);
     }
 
-    const agent = STORE.agents.get(job.agentId);
+    const agent = await getAgentFromKV(job.agentId, env);
     const service = agent.services.find(s => s.id === job.serviceId);
 
     job.status = 'accepted';
     job.deliveryDeadline = Date.now() + (service.deliveryHours * 60 * 60 * 1000);
     job.updatedAt = Date.now();
 
-    STORE.jobs.set(jobId, job);
+    await putJobToKV(jobId, job, env);
 
-    return jsonResponse({ success: true, job });
+    return jsonResponse({ success: true, job }, 200, corsHeaders);
 }
 
-async function deliverWork(jobId, data, signature, env) {
-    const job = STORE.jobs.get(jobId);
+async function deliverWork(jobId, data, signature, env, corsHeaders) {
+    const job = await getJobFromKV(jobId, env);
 
     if (!job) {
-        return jsonResponse({ error: 'Job not found' }, 404);
+        return jsonResponse({ error: 'Job not found' }, 404, corsHeaders);
     }
 
     if (!['accepted', 'in_progress'].includes(job.status)) {
-        return jsonResponse({ error: 'Invalid job status' }, 400);
+        return jsonResponse({ error: 'Invalid job status' }, 400, corsHeaders);
     }
 
     job.status = 'delivered';
@@ -741,30 +842,30 @@ async function deliverWork(jobId, data, signature, env) {
     job.deliveredAt = Date.now();
     job.updatedAt = Date.now();
 
-    STORE.jobs.set(jobId, job);
+    await putJobToKV(jobId, job, env);
 
-    return jsonResponse({ success: true, job });
+    return jsonResponse({ success: true, job }, 200, corsHeaders);
 }
 
-async function approveWork(jobId, signature, env) {
-    const job = STORE.jobs.get(jobId);
+async function approveWork(jobId, signature, env, corsHeaders) {
+    const job = await getJobFromKV(jobId, env);
 
     if (!job) {
-        return jsonResponse({ error: 'Job not found' }, 404);
+        return jsonResponse({ error: 'Job not found' }, 404, corsHeaders);
     }
 
     if (job.status !== 'delivered') {
-        return jsonResponse({ error: 'Job not delivered yet' }, 400);
+        return jsonResponse({ error: 'Job not delivered yet' }, 400, corsHeaders);
     }
 
     job.status = 'approved';
     job.approvedAt = Date.now();
     job.updatedAt = Date.now();
 
-    STORE.jobs.set(jobId, job);
+    await putJobToKV(jobId, job, env);
 
     // Update agent stats
-    const agent = STORE.agents.get(job.agentId);
+    const agent = await getAgentFromKV(job.agentId, env);
     agent.stats.jobsCompleted++;
     agent.stats.totalEarnings += job.budget * 0.85; // 85% to agent
 
@@ -772,14 +873,14 @@ async function approveWork(jobId, signature, env) {
         agent.stats.agentJobsProvided++;
 
         // Update renting agent's stats too
-        const rentingAgent = STORE.agents.get(job.renterAgentId);
+        const rentingAgent = await getAgentFromKV(job.renterAgentId, env);
         if (rentingAgent) {
             rentingAgent.stats.agentJobsRented++;
-            STORE.agents.set(job.renterAgentId, rentingAgent);
+            await putAgentToKV(job.renterAgentId, rentingAgent, env);
         }
     }
 
-    STORE.agents.set(job.agentId, agent);
+    await putAgentToKV(job.agentId, agent, env);
 
     // TODO: Trigger on-chain payment release
     // await releaseEscrow(job);
@@ -793,14 +894,14 @@ async function approveWork(jobId, signature, env) {
             protocolFee: job.budget * 0.10,
             daoFee: job.budget * 0.05
         }
-    });
+    }, 200, corsHeaders);
 }
 
-async function disputeJob(jobId, reason, signature, env) {
-    const job = STORE.jobs.get(jobId);
+async function disputeJob(jobId, reason, signature, env, corsHeaders) {
+    const job = await getJobFromKV(jobId, env);
 
     if (!job) {
-        return jsonResponse({ error: 'Job not found' }, 404);
+        return jsonResponse({ error: 'Job not found' }, 404, corsHeaders);
     }
 
     job.status = 'disputed';
@@ -808,20 +909,20 @@ async function disputeJob(jobId, reason, signature, env) {
     job.disputedAt = Date.now();
     job.updatedAt = Date.now();
 
-    STORE.jobs.set(jobId, job);
+    await putJobToKV(jobId, job, env);
 
-    return jsonResponse({ success: true, job });
+    return jsonResponse({ success: true, job }, 200, corsHeaders);
 }
 
-async function submitReview(jobId, data, signature, env) {
-    const job = STORE.jobs.get(jobId);
+async function submitReview(jobId, data, signature, env, corsHeaders) {
+    const job = await getJobFromKV(jobId, env);
 
     if (!job) {
-        return jsonResponse({ error: 'Job not found' }, 404);
+        return jsonResponse({ error: 'Job not found' }, 404, corsHeaders);
     }
 
     if (job.status !== 'approved') {
-        return jsonResponse({ error: 'Can only review approved jobs' }, 400);
+        return jsonResponse({ error: 'Can only review approved jobs' }, 400, corsHeaders);
     }
 
     const reviewId = `review_${Date.now()}`;
@@ -838,48 +939,49 @@ async function submitReview(jobId, data, signature, env) {
     };
 
     // Store review
-    const agentReviews = STORE.reviews.get(job.agentId) || [];
+    const agentReviews = await getReviewsFromKV(job.agentId, env);
     agentReviews.push(review);
-    STORE.reviews.set(job.agentId, agentReviews);
+    await putReviewsToKV(job.agentId, agentReviews, env);
 
     // Update agent rating
-    const agent = STORE.agents.get(job.agentId);
+    const agent = await getAgentFromKV(job.agentId, env);
     const allRatings = agentReviews.map(r => r.rating);
     agent.stats.rating = allRatings.reduce((a, b) => a + b, 0) / allRatings.length;
     agent.stats.reviewCount = agentReviews.length;
-    STORE.agents.set(job.agentId, agent);
+    await putAgentToKV(job.agentId, agent, env);
 
-    return jsonResponse({ success: true, review });
+    return jsonResponse({ success: true, review }, 200, corsHeaders);
 }
 
-async function getAgentReviews(agentId, env) {
-    const reviews = STORE.reviews.get(agentId) || [];
+async function getAgentReviews(agentId, env, corsHeaders) {
+    const reviews = await getReviewsFromKV(agentId, env);
 
     // Separate user vs agent reviews
     const userReviews = reviews.filter(r => r.reviewerType === 'user');
-    const agentReviews = reviews.filter(r => r.reviewerType === 'agent');
+    const agentReviewsList = reviews.filter(r => r.reviewerType === 'agent');
 
     return jsonResponse({
         reviews,
         summary: {
             total: reviews.length,
             fromUsers: userReviews.length,
-            fromAgents: agentReviews.length,
+            fromAgents: agentReviewsList.length,
             averageRating: reviews.length > 0
                 ? reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length
                 : 0
         }
-    });
+    }, 200, corsHeaders);
 }
 
-async function getAgentEarnings(agentId, signature, env) {
-    const agent = STORE.agents.get(agentId);
+async function getAgentEarnings(agentId, signature, env, corsHeaders) {
+    const agent = await getAgentFromKV(agentId, env);
 
     if (!agent) {
-        return jsonResponse({ error: 'Agent not found' }, 404);
+        return jsonResponse({ error: 'Agent not found' }, 404, corsHeaders);
     }
 
-    const jobs = Array.from(STORE.jobs.values())
+    const allJobs = await listJobsFromKV(env);
+    const jobs = allJobs
         .filter(j => j.agentId === agentId && j.status === 'approved');
 
     const fromUsers = jobs.filter(j => j.renterType === 'user');
@@ -898,7 +1000,7 @@ async function getAgentEarnings(agentId, signature, env) {
                 earnings: fromAgents.reduce((sum, j) => sum + j.budget * 0.85, 0)
             }
         }
-    });
+    }, 200, corsHeaders);
 }
 
 // ============================================
@@ -909,7 +1011,7 @@ async function getAgentEarnings(agentId, signature, env) {
 // Bags.fm Routes
 // ============================================
 
-async function handleBags(request, path, env) {
+async function handleBags(request, path, env, corsHeaders) {
     const method = request.method;
 
     // GET /api/v1/bags/claimable/:wallet - Get claimable fees for wallet
@@ -918,9 +1020,9 @@ async function handleBags(request, path, env) {
         const wallet = claimableMatch[1];
         try {
             const claimable = await bagsGetClaimable(wallet, env);
-            return jsonResponse({ success: true, ...claimable });
+            return jsonResponse({ success: true, ...claimable }, 200, corsHeaders);
         } catch (error) {
-            return jsonResponse({ error: error.message }, 500);
+            return jsonResponse({ error: error.message }, 500, corsHeaders);
         }
     }
 
@@ -933,9 +1035,9 @@ async function handleBags(request, path, env) {
                 success: true, 
                 ...result,
                 instructions: 'Copy the transaction to your wallet and sign it to claim fees'
-            });
+            }, 200, corsHeaders);
         } catch (error) {
-            return jsonResponse({ error: error.message }, 500);
+            return jsonResponse({ error: error.message }, 500, corsHeaders);
         }
     }
 
@@ -944,9 +1046,9 @@ async function handleBags(request, path, env) {
     if (feesMatch && method === 'GET') {
         try {
             const fees = await bagsGetLifetimeFees(feesMatch[1], env);
-            return jsonResponse({ success: true, ...fees });
+            return jsonResponse({ success: true, ...fees }, 200, corsHeaders);
         } catch (error) {
-            return jsonResponse({ error: error.message }, 500);
+            return jsonResponse({ error: error.message }, 500, corsHeaders);
         }
     }
 
@@ -959,23 +1061,23 @@ async function handleBags(request, path, env) {
         const slippageBps = url.searchParams.get('slippageBps');
 
         if (!inputMint || !outputMint || !amount) {
-            return jsonResponse({ error: 'Missing required params: inputMint, outputMint, amount' }, 400);
+            return jsonResponse({ error: 'Missing required params: inputMint, outputMint, amount' }, 400, corsHeaders);
         }
 
         try {
             const quote = await bagsGetQuote(inputMint, outputMint, amount, slippageBps, env);
-            return jsonResponse({ success: true, ...quote });
+            return jsonResponse({ success: true, ...quote }, 200, corsHeaders);
         } catch (error) {
-            return jsonResponse({ error: error.message }, 500);
+            return jsonResponse({ error: error.message }, 500, corsHeaders);
         }
     }
 
     // GET /api/v1/bags/agent/:agentId/token - Get agent's token info
     const agentTokenMatch = path.match(/^\/api\/v1\/bags\/agent\/([^\/]+)\/token$/);
     if (agentTokenMatch && method === 'GET') {
-        const agent = STORE.agents.get(agentTokenMatch[1]);
+        const agent = await getAgentFromKV(agentTokenMatch[1], env);
         if (!agent) {
-            return jsonResponse({ error: 'Agent not found' }, 404);
+            return jsonResponse({ error: 'Agent not found' }, 404, corsHeaders);
         }
 
         if (!agent.token?.mint) {
@@ -983,7 +1085,7 @@ async function handleBags(request, path, env) {
                 success: true, 
                 hasToken: false,
                 message: 'Agent does not have a token yet'
-            });
+            }, 200, corsHeaders);
         }
 
         // Get token stats from Bags
@@ -995,7 +1097,7 @@ async function handleBags(request, path, env) {
                 token: agent.token,
                 lifetimeFees: fees,
                 buyUrl: `https://bags.fm/${agent.token.mint}`
-            });
+            }, 200, corsHeaders);
         } catch (error) {
             return jsonResponse({
                 success: true,
@@ -1003,18 +1105,18 @@ async function handleBags(request, path, env) {
                 token: agent.token,
                 lifetimeFees: null,
                 buyUrl: `https://bags.fm/${agent.token.mint}`
-            });
+            }, 200, corsHeaders);
         }
     }
 
-    return jsonResponse({ error: 'Bags route not found' }, 404);
+    return jsonResponse({ error: 'Bags route not found' }, 404, corsHeaders);
 }
 
 // ============================================
 // Token-Gated Access Check Routes
 // ============================================
 
-async function handleAccessCheck(request, path, env) {
+async function handleAccessCheck(request, path, env, corsHeaders) {
     const method = request.method;
 
     // GET /api/v1/access/:agentId/:wallet - Check access level for wallet
@@ -1023,9 +1125,9 @@ async function handleAccessCheck(request, path, env) {
         const agentId = accessMatch[1];
         const userWallet = accessMatch[2];
 
-        const agent = STORE.agents.get(agentId);
+        const agent = await getAgentFromKV(agentId, env);
         if (!agent) {
-            return jsonResponse({ error: 'Agent not found' }, 404);
+            return jsonResponse({ error: 'Agent not found' }, 404, corsHeaders);
         }
 
         // If agent doesn't have a token or doesn't require holding, grant full access
@@ -1037,12 +1139,11 @@ async function handleAccessCheck(request, path, env) {
                 jobsPerDay: Infinity,
                 tokenRequired: false,
                 message: 'This agent does not require token holding'
-            });
+            }, 200, corsHeaders);
         }
 
         // Check user's token balance via Solana RPC
         // In production, this would query the actual on-chain balance
-        // For hackathon demo, we'll simulate based on stored data
         const balance = await getTokenBalance(userWallet, agent.token.mint, env);
 
         const tier = calculateAccessTier(balance, agent.accessTiers);
@@ -1060,32 +1161,35 @@ async function handleAccessCheck(request, path, env) {
             message: tier.level === 'none' 
                 ? `Buy at least ${agent.accessTiers.basic} ${agent.token.symbol} tokens to rent this agent`
                 : `You have ${tier.level} access (${tier.jobsPerDay} jobs/day)`
-        });
+        }, 200, corsHeaders);
     }
 
-    return jsonResponse({ error: 'Access route not found' }, 404);
+    return jsonResponse({ error: 'Access route not found' }, 404, corsHeaders);
 }
 
 /**
- * Get token balance for a wallet (simulated for hackathon)
- * In production: query Solana RPC
+ * Get token balance for a wallet
+ * In production: query Solana RPC for on-chain balance
  */
 async function getTokenBalance(wallet, tokenMint, env) {
-    // Simulated balance lookup
-    // In production, use @solana/web3.js to query:
+    // Check KV for cached balance
+    const balanceKey = `balance_${wallet}_${tokenMint}`;
+    
+    try {
+        const storedBalance = await env.BALANCES?.get(balanceKey, 'json');
+        if (storedBalance !== null && storedBalance !== undefined) {
+            return storedBalance;
+        }
+    } catch (e) {
+        // BALANCES KV may not exist yet
+    }
+    
+    // TODO: Query Solana RPC for actual on-chain balance
     // const connection = new Connection(env.SOLANA_RPC_URL);
     // const tokenAccounts = await connection.getTokenAccountsByOwner(...)
     
-    // For demo: return random balance or check if we stored it
-    const balanceKey = `balance_${wallet}_${tokenMint}`;
-    const storedBalance = STORE.balances?.get(balanceKey);
-    
-    if (storedBalance !== undefined) {
-        return storedBalance;
-    }
-    
-    // Simulate: 50% chance of having tokens, random amount
-    return Math.random() > 0.5 ? Math.floor(Math.random() * 15000) : 0;
+    // Default: return 0 if no balance found
+    return 0;
 }
 
 /**
@@ -1104,10 +1208,19 @@ function calculateAccessTier(balance, tiers) {
     return { level: 'none', jobsPerDay: 0 };
 }
 
-function jsonResponse(data, status = 200) {
+// Default CORS headers for internal use
+const DEFAULT_CORS_HEADERS = {
+    'Access-Control-Allow-Origin': 'https://agentsonrent.org',
+    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, X-Signature, X-Agent-Id',
+    'Access-Control-Allow-Credentials': 'true',
+    'Content-Type': 'application/json'
+};
+
+function jsonResponse(data, status = 200, corsHeaders = null) {
     return new Response(JSON.stringify(data), {
         status,
-        headers: CORS_HEADERS
+        headers: corsHeaders || DEFAULT_CORS_HEADERS
     });
 }
 

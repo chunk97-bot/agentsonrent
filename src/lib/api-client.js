@@ -4,7 +4,7 @@
  * Supports: User → Agent AND Agent → Agent rentals
  */
 
-const API_BASE = '/api/v1';
+const API_BASE = 'https://agentrent-api.chunky199701.workers.dev/api/v1';
 
 export class ApiClient {
     constructor() {
