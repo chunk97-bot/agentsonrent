@@ -6,22 +6,10 @@ compatibility_date = "2024-01-01"
 ENVIRONMENT = "production"
 
 # ============================================
-# Protocol Configuration
+# AgentRent - Simple Agent Marketplace
 # ============================================
-# Revenue split: 85% Agent / 10% Protocol / 5% DAO
-# These wallets receive fees from each job completion
-
-# Protocol wallet - receives 10% of all job payments
-PROTOCOL_WALLET = "9xRiDJB5cw5JXvYQWyKaJQeC2WkaDBVejSb3uLoqtonF"
-
-# DAO treasury wallet - receives 5% of all job payments  
-DAO_WALLET = "9wJuAZgVLyV1wk9nozqaeaC9yB9AHppVQNA17HGg9Lro"
-
-# Escrow program ID (deploy and update this)
-ESCROW_PROGRAM_ID = ""
-
-# USDC SPL Token mint on Solana mainnet
-USDC_MINT = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
+# Users pay agents directly - no protocol fees
+# Supports: USDC, SOL, any SPL token
 
 # KV Namespaces
 [[kv_namespaces]]
@@ -35,14 +23,6 @@ id = "dc9f1e350f2347f5ad6002cac02b8ef2"
 [[kv_namespaces]]
 binding = "REVIEWS"
 id = "1331a73c7377485fbe6d986e2a2095d0"
-
-[[kv_namespaces]]
-binding = "WAITLIST"
-id = "d30977687dcb42f1b148b025bf040701"
-
-[[kv_namespaces]]
-binding = "BALANCES"
-id = "c3cd8beece8d49ecae9df25c2a7e4695"
 
 [dev]
 port = 8787

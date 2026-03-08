@@ -1,41 +1,33 @@
 /**
- * AgentRent - Main Application
- * Production version - Uses real API, no mock data
+ * AgentRent - Main Application (Simplified)
+ * Clean agent rental marketplace
  */
 
 import { WalletAdapter } from './wallet.js';
-import { ApiClient } from './api-client.js';
 import { showToast, formatAddress, formatRating, escapeHtml } from './utils.js';
 
-// Initialize
+// API base URL
+const API_BASE = 'https://agentrent-api.chunky199701.workers.dev';
+
+// Initialize wallet
 const wallet = new WalletAdapter();
-const api = new ApiClient();
 
 // State
 let currentWallet = null;
 let agents = [];
 let currentCategory = '';
 let searchQuery = '';
-let isLoading = false;
-
-// Platform Stats (fetched from API)
-let platformStats = {
-    agentCount: 0,
-    totalFeesEarned: 0,
-    jobsCompleted: 0,
-    waitlistCount: 0
-};
 
 // DOM Ready
 document.addEventListener('DOMContentLoaded', () => {
     initWallet();
-    initWaitlist();
     loadAgents();
-    loadPlatformStats();
+    loadStats();
     initSearch();
-    initModal();
-    
-    // Listen for wallet events
+    initModals();
+    initRegisterForm();
+
+    // Wallet events
     wallet.on('disconnect', () => {
         currentWallet = null;
         updateWalletUI(null);
@@ -50,7 +42,7 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // ============================================
-// Wallet Integration
+// Wallet
 // ============================================
 
 function initWallet() {
@@ -81,7 +73,6 @@ async function connectWallet(walletType) {
     const originalContent = btn.innerHTML;
     
     try {
-        // Show loading state
         btn.innerHTML = '<span class="spinner"></span> Connecting...';
         btn.disabled = true;
 
@@ -90,18 +81,8 @@ async function connectWallet(walletType) {
         if (address) {
             currentWallet = address;
             updateWalletUI(address);
-            closeWalletModal();
+            closeModal('wallet-modal');
             showToast('success', `Connected: ${formatAddress(address)}`);
-            
-            // Check SOL balance
-            try {
-                const { hasEnough, balance } = await wallet.checkSufficientBalance(0.01);
-                if (!hasEnough) {
-                    showToast('warning', `Low SOL balance (${balance.toFixed(4)} SOL). You need at least 0.01 SOL for transaction fees.`);
-                }
-            } catch (e) {
-                console.warn('Balance check failed:', e);
-            }
         }
     } catch (error) {
         showToast('error', error.message || 'Failed to connect wallet');
@@ -142,316 +123,305 @@ async function checkExistingConnection() {
 }
 
 // ============================================
-// Platform Stats
+// Stats
 // ============================================
 
-async function loadPlatformStats() {
+async function loadStats() {
     try {
-        const response = await api.getStats();
-        if (response) {
-            platformStats = response;
-            updateStatsUI();
-        }
+        const response = await fetch(`${API_BASE}/api/v1/stats`);
+        const data = await response.json();
+
+        document.getElementById('agent-count').textContent = data.agentCount || 0;
+        document.getElementById('jobs-completed').textContent = data.jobsCompleted || 0;
+        document.getElementById('total-earnings').textContent = `$${(data.totalEarnings || 0).toLocaleString()}`;
     } catch (error) {
         console.warn('Failed to load stats:', error);
-        // Show zeros if API fails
-        updateStatsUI();
     }
 }
 
-function updateStatsUI() {
-    const agentCountEl = document.getElementById('agent-count');
-    const feesEarnedEl = document.getElementById('fees-earned');
-    const jobsCompletedEl = document.getElementById('jobs-completed');
-    const waitlistNumberEl = document.getElementById('waitlist-number');
-
-    if (agentCountEl) agentCountEl.textContent = platformStats.agentCount || 0;
-    if (feesEarnedEl) feesEarnedEl.textContent = `$${(platformStats.totalFeesEarned || 0).toLocaleString()}`;
-    if (jobsCompletedEl) jobsCompletedEl.textContent = (platformStats.jobsCompleted || 0).toLocaleString();
-    if (waitlistNumberEl) waitlistNumberEl.textContent = (platformStats.waitlistCount || 0).toLocaleString();
-}
-
 // ============================================
-// Waitlist Form
-// ============================================
-
-function initWaitlist() {
-    const form = document.getElementById('waitlist-form');
-    const emailInput = document.getElementById('waitlist-email');
-
-    if (!form) return;
-
-    form.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const email = emailInput.value.trim();
-
-        if (!email) return;
-
-        const submitBtn = form.querySelector('button[type="submit"]');
-        const originalText = submitBtn.textContent;
-        
-        try {
-            submitBtn.disabled = true;
-            submitBtn.textContent = 'Joining...';
-
-            await api.joinWaitlist(email);
-            showToast('success', 'You\'re on the waitlist! 🎉');
-            emailInput.value = '';
-
-            // Refresh stats to get new waitlist count
-            await loadPlatformStats();
-        } catch (error) {
-            showToast('error', error.message || 'Failed to join waitlist');
-        } finally {
-            submitBtn.disabled = false;
-            submitBtn.textContent = originalText;
-        }
-    });
-}
-
-// ============================================
-// Agent Grid
+// Agents
 // ============================================
 
 async function loadAgents() {
     const grid = document.getElementById('agents-grid');
-    
-    // Show loading state
-    grid.innerHTML = `
-        <div class="agent-card loading">
-            <div class="skeleton skeleton-avatar"></div>
-            <div class="skeleton skeleton-text"></div>
-            <div class="skeleton skeleton-text short"></div>
-        </div>
-        <div class="agent-card loading">
-            <div class="skeleton skeleton-avatar"></div>
-            <div class="skeleton skeleton-text"></div>
-            <div class="skeleton skeleton-text short"></div>
-        </div>
-        <div class="agent-card loading">
-            <div class="skeleton skeleton-avatar"></div>
-            <div class="skeleton skeleton-text"></div>
-            <div class="skeleton skeleton-text short"></div>
-        </div>
-    `;
-    
-    isLoading = true;
+    grid.innerHTML = '<div class="loading-message">Loading agents...</div>';
 
     try {
-        const response = await api.getAgents();
-        agents = response.agents ? Object.values(response.agents) : [];
-        renderAgents(agents);
+        let url = `${API_BASE}/api/v1/agents?limit=50`;
+        if (currentCategory) url += `&category=${currentCategory}`;
+        if (searchQuery) url += `&search=${encodeURIComponent(searchQuery)}`;
+
+        const response = await fetch(url);
+        const data = await response.json();
+
+        agents = data.agents || [];
+        renderAgents();
     } catch (error) {
         console.error('Failed to load agents:', error);
-        grid.innerHTML = `
-            <div class="no-results">
-                <p>Failed to load agents. <button class="btn btn-secondary" onclick="location.reload()">Retry</button></p>
-            </div>
-        `;
-    } finally {
-        isLoading = false;
+        grid.innerHTML = '<div class="error-message">Failed to load agents. Please try again.</div>';
     }
 }
 
-function renderAgents(agentList) {
+function renderAgents() {
     const grid = document.getElementById('agents-grid');
 
-    if (!agentList || agentList.length === 0) {
+    if (agents.length === 0) {
         grid.innerHTML = `
-            <div class="no-results">
-                <div class="empty-state">
-                    <span class="empty-icon">🤖</span>
-                    <h3>No Agents Yet</h3>
-                    <p>Be the first to list your AI agent and start earning!</p>
-                    <a href="#list-agent" class="btn btn-primary">Launch Your Agent</a>
-                </div>
+            <div class="empty-state">
+                <p>No agents found</p>
+                <button class="btn btn-primary" onclick="openRegisterModal()">Register Your Agent</button>
             </div>
         `;
         return;
     }
 
-    grid.innerHTML = agentList.map(agent => createAgentCard(agent)).join('');
-
-    // Add click handlers
-    grid.querySelectorAll('.btn-rent').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            const agentId = e.target.dataset.agentId;
-            handleRentClick(agentId);
-        });
-    });
-}
-
-function createAgentCard(agent) {
-    const name = escapeHtml(agent.name || agent.profile?.name || 'Unnamed Agent');
-    const description = escapeHtml(agent.description || agent.profile?.description || 'AI Agent');
-    const avatar = agent.avatar || agent.profile?.avatar || '🤖';
-    const category = agent.category || agent.profile?.category || 'other';
-    const rating = agent.rating || 0;
-    const reviewCount = agent.reviewCount || 0;
-    const jobsCompleted = agent.jobsCompleted || 0;
-    const isOnline = agent.isOnline !== false;
-    const services = agent.services || [];
-
-    const servicesHtml = services.slice(0, 2).map(service => `
-        <div class="service-tag">
-            <span>${escapeHtml(service.name)}</span>
-            <span class="service-price">${service.price} ${service.currency || 'USDC'}</span>
-        </div>
-    `).join('');
-
-    const statusDot = isOnline
-        ? '<span class="status-dot online">●</span>'
-        : '<span class="status-dot offline">●</span>';
-
-    return `
+    grid.innerHTML = agents.map(agent => `
         <div class="agent-card" data-agent-id="${escapeHtml(agent.id)}">
             <div class="agent-header">
-                <div class="agent-avatar">${avatar}</div>
-                <div>
-                    <div class="agent-name">${name}</div>
-                    <div class="agent-rating">
-                        <span class="star">★</span>
-                        <span>${rating.toFixed(1)}</span>
-                        <span class="review-count">(${reviewCount.toLocaleString()})</span>
-                    </div>
+                <span class="agent-avatar">${escapeHtml(agent.avatar)}</span>
+                <div class="agent-info">
+                    <h3>${escapeHtml(agent.name)}</h3>
+                    <span class="category-badge">${escapeHtml(agent.category)}</span>
                 </div>
-                <span class="category-badge">${escapeHtml(category)}</span>
+                ${agent.isOnline ? '<span class="online-indicator">Online</span>' : ''}
             </div>
-            <p class="agent-description">${description}</p>
+            <p class="agent-description">${escapeHtml(agent.description || 'No description')}</p>
+            <div class="agent-stats">
+                <span class="rating">${formatRating(agent.stats?.rating || 0)} (${agent.stats?.reviewCount || 0})</span>
+                <span class="jobs">${agent.stats?.jobsCompleted || 0} jobs</span>
+            </div>
             <div class="agent-services">
-                ${servicesHtml}
-                ${services.length > 2 ? `<span class="more-services">+${services.length - 2} more</span>` : ''}
+                ${(agent.services || []).slice(0, 3).map(s => `
+                    <div class="service-chip">
+                        <span class="service-name">${escapeHtml(s.name)}</span>
+                        <span class="service-price">${s.price} ${s.currency}</span>
+                    </div>
+                `).join('')}
             </div>
-            <div class="agent-footer">
-                <div class="agent-meta">
-                    ${statusDot} ${isOnline ? 'Online' : 'Offline'} · ${jobsCompleted} jobs
-                </div>
-                <button class="btn btn-primary btn-rent" data-agent-id="${escapeHtml(agent.id)}">
-                    Rent
-                </button>
-            </div>
+            <button class="btn btn-primary btn-rent" onclick="openRentModal('${escapeHtml(agent.id)}')">
+                Rent Agent
+            </button>
         </div>
-    `;
-}
-
-async function handleRentClick(agentId) {
-    if (!currentWallet) {
-        document.getElementById('wallet-modal').classList.remove('hidden');
-        showToast('info', 'Connect wallet to rent agents');
-        return;
-    }
-
-    // Check balance before proceeding
-    try {
-        const { hasEnough, balance } = await wallet.checkSufficientBalance(0.01);
-        if (!hasEnough) {
-            showToast('error', `Insufficient SOL balance (${balance.toFixed(4)} SOL). You need at least 0.01 SOL for transaction fees.`);
-            return;
-        }
-    } catch (e) {
-        console.warn('Balance check failed:', e);
-    }
-
-    // Navigate to agent detail page or show modal
-    const agent = agents.find(a => a.id === agentId);
-    if (agent) {
-        // For now, show a toast. In production, navigate to agent page
-        showToast('info', `Opening ${agent.name || 'Agent'}... (Feature coming soon)`);
-        // window.location.href = `/agent/${agentId}`;
-    }
+    `).join('');
 }
 
 // ============================================
-// Search & Filter
+// Search & Filters
 // ============================================
 
 function initSearch() {
     const searchInput = document.getElementById('agent-search');
     const categorySelect = document.getElementById('category-filter');
 
-    if (searchInput) {
-        searchInput.addEventListener('input', (e) => {
-            searchQuery = e.target.value.toLowerCase();
-            filterAgents();
-        });
-    }
+    let searchTimeout;
+    searchInput?.addEventListener('input', (e) => {
+        clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(() => {
+            searchQuery = e.target.value.trim();
+            loadAgents();
+        }, 300);
+    });
 
-    if (categorySelect) {
-        categorySelect.addEventListener('change', (e) => {
-            currentCategory = e.target.value;
-            filterAgents();
-        });
-    }
-}
-
-function filterAgents() {
-    let filtered = agents;
-
-    if (currentCategory) {
-        filtered = filtered.filter(a => 
-            (a.category || a.profile?.category) === currentCategory
-        );
-    }
-
-    if (searchQuery) {
-        filtered = filtered.filter(a => {
-            const name = (a.name || a.profile?.name || '').toLowerCase();
-            const desc = (a.description || a.profile?.description || '').toLowerCase();
-            const services = a.services || [];
-            
-            return name.includes(searchQuery) ||
-                   desc.includes(searchQuery) ||
-                   services.some(s => s.name.toLowerCase().includes(searchQuery));
-        });
-    }
-
-    renderAgents(filtered);
+    categorySelect?.addEventListener('change', (e) => {
+        currentCategory = e.target.value;
+        loadAgents();
+    });
 }
 
 // ============================================
-// Modal
+// Modals
 // ============================================
 
-function initModal() {
-    const modal = document.getElementById('wallet-modal');
-    const closeBtn = document.getElementById('close-wallet-modal');
+function initModals() {
+    // Close buttons
+    document.querySelectorAll('.modal-close').forEach(btn => {
+        btn.addEventListener('click', () => {
+            btn.closest('.modal').classList.add('hidden');
+        });
+    });
 
-    if (!modal || !closeBtn) return;
+    // Click outside to close
+    document.querySelectorAll('.modal').forEach(modal => {
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                modal.classList.add('hidden');
+            }
+        });
+    });
+}
 
-    closeBtn.addEventListener('click', closeWalletModal);
+function closeModal(modalId) {
+    document.getElementById(modalId)?.classList.add('hidden');
+}
 
-    modal.addEventListener('click', (e) => {
-        if (e.target === modal) {
-            closeWalletModal();
+// Global functions for onclick handlers
+window.openRentModal = function(agentId) {
+    if (!currentWallet) {
+        showToast('warning', 'Please connect your wallet first');
+        document.getElementById('wallet-modal').classList.remove('hidden');
+        return;
+    }
+
+    const agent = agents.find(a => a.id === agentId);
+    if (!agent) return;
+
+    const modal = document.getElementById('rent-modal');
+    const content = modal.querySelector('.modal-body');
+
+    content.innerHTML = `
+        <h2>Rent ${escapeHtml(agent.name)}</h2>
+        <p>Select a service:</p>
+        <div class="services-list">
+            ${(agent.services || []).map(s => `
+                <div class="service-option" data-service-id="${escapeHtml(s.id)}">
+                    <div class="service-details">
+                        <strong>${escapeHtml(s.name)}</strong>
+                        <p>${escapeHtml(s.description || '')}</p>
+                    </div>
+                    <div class="service-price">
+                        <span class="price">${s.price} ${s.currency}</span>
+                        <span class="delivery">Delivery: ${s.deliveryHours}h</span>
+                    </div>
+                    <button class="btn btn-primary" onclick="rentService('${escapeHtml(agentId)}', '${escapeHtml(s.id)}')">
+                        Pay ${s.price} ${s.currency}
+                    </button>
+                </div>
+            `).join('')}
+        </div>
+        <div class="payment-info">
+            <p><strong>Payment goes directly to:</strong></p>
+            <code>${agent.wallet || 'Agent wallet'}</code>
+        </div>
+    `;
+
+    modal.classList.remove('hidden');
+};
+
+window.rentService = async function(agentId, serviceId) {
+    if (!currentWallet) {
+        showToast('error', 'Wallet not connected');
+        return;
+    }
+
+    const agent = agents.find(a => a.id === agentId);
+    const service = agent?.services.find(s => s.id === serviceId);
+    if (!agent || !service) return;
+
+    try {
+        // Create job in API
+        const response = await fetch(`${API_BASE}/api/v1/jobs`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Wallet-Address': currentWallet
+            },
+            body: JSON.stringify({
+                agentId,
+                serviceId,
+                userWallet: currentWallet,
+                requirements: ''
+            })
+        });
+
+        const data = await response.json();
+        if (!response.ok) {
+            throw new Error(data.error || 'Failed to create job');
+        }
+
+        showToast('success', `Job created! Send ${service.price} ${service.currency} to ${formatAddress(agent.wallet)}`);
+        closeModal('rent-modal');
+
+        // Show payment instructions
+        alert(`Payment Instructions:\n\n1. Send ${service.price} ${service.currency}\n2. To: ${agent.wallet}\n3. Job ID: ${data.job.id}\n\nThe agent will accept your job once payment is confirmed.`);
+
+    } catch (error) {
+        showToast('error', error.message);
+    }
+};
+
+window.openRegisterModal = function() {
+    if (!currentWallet) {
+        showToast('warning', 'Please connect your wallet first');
+        document.getElementById('wallet-modal').classList.remove('hidden');
+        return;
+    }
+    document.getElementById('register-modal').classList.remove('hidden');
+};
+
+// ============================================
+// Register Agent Form
+// ============================================
+
+function initRegisterForm() {
+    const form = document.getElementById('register-form');
+    if (!form) return;
+
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+
+        if (!currentWallet) {
+            showToast('error', 'Please connect your wallet first');
+            return;
+        }
+
+        const formData = new FormData(form);
+        const submitBtn = form.querySelector('button[type="submit"]');
+        const originalText = submitBtn.textContent;
+
+        try {
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Registering...';
+
+            // Parse services from form
+            const services = [];
+            const serviceNames = formData.getAll('service-name');
+            const servicePrices = formData.getAll('service-price');
+            const serviceCurrencies = formData.getAll('service-currency');
+
+            for (let i = 0; i < serviceNames.length; i++) {
+                if (serviceNames[i]) {
+                    services.push({
+                        name: serviceNames[i],
+                        price: parseFloat(servicePrices[i]) || 0,
+                        currency: serviceCurrencies[i] || 'USDC',
+                        deliveryHours: 24
+                    });
+                }
+            }
+
+            const response = await fetch(`${API_BASE}/api/v1/agents`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Wallet-Address': currentWallet
+                },
+                body: JSON.stringify({
+                    wallet: currentWallet,
+                    name: formData.get('name'),
+                    description: formData.get('description'),
+                    category: formData.get('category'),
+                    avatar: formData.get('avatar') || '🤖',
+                    services
+                })
+            });
+
+            const data = await response.json();
+            if (!response.ok) {
+                throw new Error(data.error || 'Failed to register agent');
+            }
+
+            showToast('success', 'Agent registered successfully!');
+            closeModal('register-modal');
+            form.reset();
+            loadAgents();
+            loadStats();
+
+        } catch (error) {
+            showToast('error', error.message);
+        } finally {
+            submitBtn.disabled = false;
+            submitBtn.textContent = originalText;
         }
     });
-
-    document.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape') {
-            closeWalletModal();
-        }
-    });
 }
-
-function closeWalletModal() {
-    const modal = document.getElementById('wallet-modal');
-    if (modal) {
-        modal.classList.add('hidden');
-    }
-}
-
-// ============================================
-// Load More
-// ============================================
-
-const loadMoreBtn = document.getElementById('load-more-agents');
-if (loadMoreBtn) {
-    loadMoreBtn.addEventListener('click', async () => {
-        if (isLoading) return;
-        
-        // In production, implement pagination
-        showToast('info', 'All agents loaded');
-    });
-}
-
-console.log('🤖 AgentRent Production v1.0');
